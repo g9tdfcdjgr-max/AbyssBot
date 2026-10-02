@@ -1,4 +1,12 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType } = require('discord.js');
+const http = require('http');
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot Discord actif 24/7 !\n');
+});
+server.listen(process.env.PORT || 3000, () => {
+  console.log('Serveur web prêt pour garder le bot éveillé !');
+});
 
 const client = new Client({
     intents: [
