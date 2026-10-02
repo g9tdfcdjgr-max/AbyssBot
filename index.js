@@ -287,6 +287,42 @@ client.on('messageCreate', async message => {
         }
     }
 });
+// --- SYSTÈME DE POINTS ---
+const points = {}; // Mémoire pour stocker les points
+
+client.on('messageCreate', async message => {
+    if (message.author.bot || !message.guild) return;
+
+    // Commande : !addonepoint @utilisateur (Réservé au créateur ou admins)
+    if (message.content.startsWith('!addonepoint')) {
+        // Optionnel : vérifier si c'est bien toi (avec ton ID) qui fais la commande
+        if (message.author.id !== TON_ID_DISCORD) {
+            return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+        }
+
+        const target = message.mentions.users.first();
+        if (!target) {
+            return message.reply("Il faut mentionner quelqu'un ! Exemple : `!addonepoint @nom`");
+        }
+
+        // Initialise les points si l'utilisateur n'en a pas encore
+        if (!points[target.id]) {
+            points[target.id] = 0;
+        }
+
+        points[target.id] += 1;
+        message.channel.send(`✅ 1 point a été ajouté à ${target.username}. Total : **${points[target.id]} point(s)**.`);
+    }
+
+    // Commande : !point (Pour voir ses propres points ou ceux d'un autre)
+    if (message.content === '!point' || message.content.startsWith('!point ')) {
+        const target = message.mentions.users.first() || message.author;
+        const userPoints = points[target.id] || 0;
+        
+        message.channel.send(`🏆 ${target.username} a **${userPoints} point(s)**.`);
+    }
+});
+
 
 
 // Connexion du bot
