@@ -1,4 +1,5 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonStyle } = require('discord.js');
+
 const http = require('http');
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -175,12 +176,39 @@ client.on('interactionCreate', async interaction => {
             permissionOverwrites: [
                 { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                { id: '1554974958692859956', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+                { id: '1554974958692859956', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
             ]
         });
 
-        await channel.send(`Bonjour ${interaction.user}, un modérateur va prendre en charge ton ticket.`);
+        // On ajoute le bouton de fermeture dans le salon du ticket
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('close_ticket')
+                .setLabel('🔒 Fermer le ticket')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        await channel.send({ 
+            content: `Bonjour ${interaction.user}, un modérateur va prendre en charge ton ticket.`,
+            components: [row]
+        });
+        
         return interaction.reply({ content: `Ticket créé : ${channel}`, flags: 64 });
+    }
+
+    // Bouton Fermeture de Ticket
+    if (interaction.isButton() && interaction.customId === 'close_ticket') {
+        const isOwner = interaction.user.id === TON_ID_DISCORD;
+        const isMod = interaction.member.roles.cache.has('1554974958692859956'); // ID de ton rôle modérateur
+
+        if (!isOwner && !isMod) {
+            return interaction.reply({ content: "Tu n'as pas la permission de fermer ce ticket !", flags: 64 });
+        }
+
+        await interaction.reply({ content: 'Fermeture du ticket dans 3 secondes...' });
+        setTimeout(async () => {
+            await interaction.channel.delete().catch(() => {});
+        }, 3000);
     }
 
     // Menu Couleurs
