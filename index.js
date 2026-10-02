@@ -263,6 +263,33 @@ client.on('messageCreate', async message => {
         await message.channel.send(texte); // Le bot envoie le message à ta place
     }
 });
+// --- COMMANDE !DIRE ---
+client.on('messageCreate', async message => {
+    if (message.content.startsWith('!dire ')) {
+        const texte = message.content.slice(6);
+        await message.delete().catch(() => {});
+        await message.channel.send(texte);
+    }
+});
+
+// --- PIÈGE ANTI-BOT ---
+const SALON_PIEGE_ID = '1555614017668775976' 
+
+client.on('messageCreate', async message => {
+    if (message.author.bot || !message.guild) return;
+
+    if (message.channel.id === SALON_PIEGE_ID) {
+        try {
+            await message.delete().catch(() => {});
+            await message.guild.members.ban(message.author.id, { 
+                reason: "Piège anti-bot : envoi de message dans un salon interdit." 
+            });
+            console.log(`[PIÈGE] ${message.author.tag} a été banni.`);
+        } catch (error) {
+            console.error("Erreur de bannissement (vérifie les permissions du bot) :", error);
+        }
+    }
+});
 
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
