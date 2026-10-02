@@ -255,5 +255,14 @@ client.on('guildMemberAdd', async member => {
 
     await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
+client.on('messageCreate', async message => {
+    // Commande pour faire parler le bot : tape !dire [ton texte]
+    if (message.content.startsWith('!dire ')) {
+        const texte = message.content.slice(6);
+        await message.delete().catch(() => {}); // Supprime ton message
+        await message.channel.send(texte); // Le bot envoie le message à ta place
+    }
+});
+
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
