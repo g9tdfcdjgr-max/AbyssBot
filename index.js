@@ -350,5 +350,29 @@ client.on('messageCreate', async message => {
         message.channel.send(`🏆 ${target.username} a **${userPoints} point(s)**.`);
     }
 });
+
+// --- COMMANDE !TICKET-SETUP ---
+if (command === '!ticket-setup') {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+    }
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('create_ticket')
+            .setLabel('🎟️ Créer un ticket')
+            .setStyle(ButtonStyle.Primary)
+    );
+
+    const embed = new EmbedBuilder()
+        .setTitle('🎟️ Support & Tickets')
+        .setDescription('Besoin d\'aide ou d\'un contact avec la modération ? Clique sur le bouton ci-dessous pour ouvrir un ticket privé.')
+        .setColor('#5865F2');
+
+    await message.delete().catch(() => {});
+    return message.channel.send({ embeds: [embed], components: [row] });
+}
+
+
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
