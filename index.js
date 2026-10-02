@@ -350,10 +350,5 @@ client.on('messageCreate', async message => {
         message.channel.send(`🏆 ${target.username} a **${userPoints} point(s)**.`);
     }
 });
-
-});
-
-
-
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
