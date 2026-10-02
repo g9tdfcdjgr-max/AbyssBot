@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const http = require('http');
 const server = http.createServer((req, res) => {
@@ -26,7 +26,7 @@ const commandsList = [
     { name: '!ban', desc: 'Bannit un membre du serveur', category: '⚙️ Administration' },
     { name: '!warn', desc: 'Donne un avertissement à un membre', category: '⚙️ Administration' },
     { name: '!ticket-setup', desc: 'Envoie le panneau de création de tickets', category: '⚙️ Administration' },
-    { name: '!roles-setup', desc: 'Envoie le menu de sélection des rôles', category: '⚙️️ Administration' },
+    { name: '!roles-setup', desc: 'Envoie le menu de sélection des rôles', category: '⚙ Administration' },
     { name: '!help', desc: 'Affiche la liste d\'aide', category: '📌 Général' }
 ];
 
@@ -70,6 +70,28 @@ client.on('messageCreate', async message => {
             .setFooter({ text: 'Bot Abyss' });
 
         return message.channel.send({ embeds: [embedHelp] });
+    }
+
+    // Commande !ticket-setup
+    if (command === '!ticket-setup') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('create_ticket')
+                .setLabel('🎟️ Créer un ticket')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎟️ Support & Tickets')
+            .setDescription('Besoin d\'aide ou d\'un contact avec la modération ? Clique sur le bouton ci-dessous pour ouvrir un ticket privé.')
+            .setColor('#5865F2');
+
+        await message.delete().catch(() => {});
+        return message.channel.send({ embeds: [embed], components: [row] });
     }
 
     // Commande !ban
@@ -180,7 +202,6 @@ client.on('interactionCreate', async interaction => {
             ]
         });
 
-        // On ajoute le bouton de fermeture dans le salon du ticket
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('close_ticket')
@@ -199,7 +220,7 @@ client.on('interactionCreate', async interaction => {
     // Bouton Fermeture de Ticket
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
         const isOwner = interaction.user.id === TON_ID_DISCORD;
-        const isMod = interaction.member.roles.cache.has('1554974958692859956'); // ID de ton rôle modérateur
+        const isMod = interaction.member.roles.cache.has('1554974958692859956');
 
         if (!isOwner && !isMod) {
             return interaction.reply({ content: "Tu n'as pas la permission de fermer ce ticket !", flags: 64 });
@@ -265,6 +286,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         }
     }
 });
+
 // =========================================================
 // MESSAGE DE BIENVENUE EN EMBED ROSE
 // =========================================================
@@ -277,7 +299,7 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
         .setTitle('✨ Nouveau membre !')
         .setDescription(`👋 Bienvenue sur le serveur, ${member} ! On est ravis de t'compter parmi nous.`)
-        .setColor('#FF69B4') // Rose
+        .setColor('#FF69B4')
         .setThumbnail(member.user.displayAvatarURL())
         .setTimestamp();
 
@@ -295,12 +317,10 @@ client.on('messageCreate', async message => {
 
 // --- PIÈGE ANTI-BOT ---
 const SALON_PIEGE_ID = '1555614017668775976';
-const TON_ID_DISCORD = '1095675404859215902'; // Ton propre ID pour ne pas te faire bannir
+const TON_ID_DISCORD = '1095675404859215902';
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
-
-    // Si c'est toi qui écris dans le salon piège, on ne fait rien (tu peux poster tes règles tranquille)
     if (message.author.id === TON_ID_DISCORD) return;
 
     if (message.channel.id === SALON_PIEGE_ID) {
@@ -309,21 +329,19 @@ client.on('messageCreate', async message => {
             await message.guild.members.ban(message.author.id, { 
                 reason: "Piège anti-bot : envoi de message dans un salon interdit." 
             });
-            console.log(`[PIÈGE] ${message.author.tag} a été banni.`);
         } catch (error) {
             console.error("Erreur de bannissement :", error);
         }
     }
 });
+
 // --- SYSTÈME DE POINTS ---
-const points = {}; // Mémoire pour stocker les points
+const points = {};
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
 
-    // Commande : !addonepoint @utilisateur (Réservé au créateur ou admins)
     if (message.content.startsWith('!addonepoint')) {
-        // Optionnel : vérifier si c'est bien toi (avec ton ID) qui fais la commande
         if (message.author.id !== TON_ID_DISCORD) {
             return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
         }
@@ -333,7 +351,6 @@ client.on('messageCreate', async message => {
             return message.reply("Il faut mentionner quelqu'un ! Exemple : `!addonepoint @nom`");
         }
 
-        // Initialise les points si l'utilisateur n'en a pas encore
         if (!points[target.id]) {
             points[target.id] = 0;
         }
@@ -342,7 +359,6 @@ client.on('messageCreate', async message => {
         message.channel.send(`✅ 1 point a été ajouté à ${target.username}. Total : **${points[target.id]} point(s)**.`);
     }
 
-    // Commande : !point (Pour voir ses propres points ou ceux d'un autre)
     if (message.content === '!point' || message.content.startsWith('!point ')) {
         const target = message.mentions.users.first() || message.author;
         const userPoints = points[target.id] || 0;
@@ -350,29 +366,6 @@ client.on('messageCreate', async message => {
         message.channel.send(`🏆 ${target.username} a **${userPoints} point(s)**.`);
     }
 });
-
-// --- COMMANDE !TICKET-SETUP ---
-if (command === '!ticket-setup') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
-    }
-
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('create_ticket')
-            .setLabel('🎟️ Créer un ticket')
-            .setStyle(ButtonStyle.Primary)
-    );
-
-    const embed = new EmbedBuilder()
-        .setTitle('🎟️ Support & Tickets')
-        .setDescription('Besoin d\'aide ou d\'un contact avec la modération ? Clique sur le bouton ci-dessous pour ouvrir un ticket privé.')
-        .setColor('#5865F2');
-
-    await message.delete().catch(() => {});
-    return message.channel.send({ embeds: [embed], components: [row] });
-}
-
 
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
