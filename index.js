@@ -273,10 +273,14 @@ client.on('messageCreate', async message => {
 });
 
 // --- PIÈGE ANTI-BOT ---
-const SALON_PIEGE_ID = '1555614017668775976' 
+const SALON_PIEGE_ID = '1555614017668775976';
+const TON_ID_DISCORD = '1095675404859215902'; // Ton propre ID pour ne pas te faire bannir
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
+
+    // Si c'est toi qui écris dans le salon piège, on ne fait rien (tu peux poster tes règles tranquille)
+    if (message.author.id === TON_ID_DISCORD) return;
 
     if (message.channel.id === SALON_PIEGE_ID) {
         try {
@@ -286,10 +290,11 @@ client.on('messageCreate', async message => {
             });
             console.log(`[PIÈGE] ${message.author.tag} a été banni.`);
         } catch (error) {
-            console.error("Erreur de bannissement (vérifie les permissions du bot) :", error);
+            console.error("Erreur de bannissement :", error);
         }
     }
 });
+
 
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
