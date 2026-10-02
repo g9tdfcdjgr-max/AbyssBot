@@ -322,45 +322,7 @@ client.on('messageCreate', async message => {
         message.channel.send(`🏆 ${target.username} a **${userPoints} point(s)**.`);
     }
 });
-// --- ANTI-TEXTE SALON MÉDIA ---
-const SALON_MEDIA_ID = '1554964028600877166'; // Remplace par l'ID de ton salon média
-let consecutiveTextMessages = []; // Tableau pour stocker les messages textuels d'affilée
 
-client.on('messageCreate', async message => {
-    if (message.author.bot || !message.guild) return;
-    if (message.channel.id !== SALON_MEDIA_ID) return;
-
-    // Vérifie si le message contient un média (image, vidéo, fichier ou lien direct)
-    const hasMedia = message.attachments.size > 0 || message.content.includes('http://') || message.content.includes('https://');
-
-    if (hasMedia) {
-        // Si quelqu'un poste un média, on remet le compteur à zéro
-        consecutiveTextMessages = [];
-    } else {
-        // Si c'est juste du texte sans média, on l'ajoute à la liste
-        consecutiveTextMessages.push(message);
-
-        // Si on dépasse 10 messages textuels d'affilée
-        if (consecutiveTextMessages.length > 10) {
-            // Récupère les auteurs uniques pour les avertir
-            const authorsToWarn = [...new Set(consecutiveTextMessages.map(m => m.author))];
-            
-            // Supprime tous les messages textuels accumulés
-            for (let msg of consecutiveTextMessages) {
-                await msg.delete().catch(() => {});
-            }
-
-            // Envoie un avertissement dans le salon
-            const mentions = authorsToWarn.map(u => `<@${u.id}>`).join(', ');
-            const warningMsg = await message.channel.send(`⚠️ ${mentions}, ce salon est réservé aux médias ! Plus de 10 messages textuels d'affilée ont été supprimés.`);
-            
-            // Supprime l'avertissement du bot après 5 secondes pour garder le salon propre
-            setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
-
-            // Réinitialise le compteur
-            consecutiveTextMessages = [];
-        }
-    }
 });
 
 
