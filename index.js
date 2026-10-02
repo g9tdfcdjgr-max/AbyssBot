@@ -248,4 +248,4 @@ client.on('guildMemberAdd', async member => {
     await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
 // Connexion du bot
-client.login('process.env.DISCORD_TOKEN');
+client.login(process.env.DISCORD_TOKEN);
