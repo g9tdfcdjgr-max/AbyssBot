@@ -32,6 +32,8 @@ const commandsList = [
 
 const userStats = {};
 const voiceJoinTimes = {};
+const userWarns = {}; // Stocke les warns sous la forme : { userId: [ { reason: "...", moderator: "..." } ] }
+
 
 client.on('ready', () => {
     console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
@@ -383,6 +385,116 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         const salonGeneral = newMember.guild.channels.cache.find(c => c.name === '💬chat');
         if (salonGeneral) {
             salonGeneral.send(`🎉 Merci infiniment pour le boost du serveur, ${newMember} ! T'assures grave 🚀`);
+        }
+    }
+});
+// --- SYSTÈME DE GESTION DES WARNS ---
+
+client.on('messageCreate', async message => {
+    if (!message.guild || message.author.bot) return;
+
+    const args = message.content.split(' ');
+    const command = args[0].toLowerCase();
+
+    // 1. Commande !warn améliorée (alerte à 3 warns)
+    if (command === '!warn') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('Utilisation : `!warn @membre [raison]`');
+        const reason = args.slice(2).join(' ') || 'Aucune raison';
+
+        if (!userWarns[target.id]) {
+            userWarns[target.id] = [];
+        }
+
+        userWarns[target.id].push({ reason, moderator: message.author.tag });
+        const totalWarns = userWarns[target.id].length;
+
+        await message.channel.send(`⚠️ **${target}** a reçu un avertissement. (Total : **${totalWarns}/3**) \nRaison : ${reason}`);
+
+        // Si l'utilisateur atteint ou dépasse 3 warns, on t'envoie un bouton de confirmation pour le ban
+        if (totalWarns >= 3) {
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`ban_yes_${target.id}`)
+                    .setLabel('🔨 Oui, bannir')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`ban_no_${target.id}`)
+                    .setLabel('❌ Ignorer')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+            await message.channel.send({
+                content: `<@${TON_ID_DISCORD}> 🚨 **Alerte modération** : ${target.user.tag} a atteint **${totalWarns} avertissements** ! Veux-tu le bannir ?`,
+                components: [row]
+            });
+        }
+    }
+
+    // 2. Commande !listwarns @membre (pour voir la liste des warns)
+    if (command === '!listwarns') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+        const target = message.mentions.members.first() || message.member;
+        const warns = userWarns[target.id] || [];
+
+        if (warns.length === 0) {
+            return message.channel.send(`✅ **${target.user.username}** n'a aucun avertissement.`);
+        }
+
+        const list = warns.map((w, index) => `**#${index + 1}** — Raison : *${w.reason}* (Par ${w.moderator})`).join('\n');
+        
+        const embedWarns = new EmbedBuilder()
+            .setTitle(`📋 Avertissements de ${target.user.username}`)
+            .setDescription(list)
+            .setColor('#FFA500');
+
+        return message.channel.send({ embeds: [embedWarns] });
+    }
+
+    // 3. Commande !delwarn @membre [numéro] (pour supprimer un warn précis)
+    if (command === '!delwarn') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+        const target = message.mentions.members.first();
+        const warnIndex = parseInt(args[2]) - 1;
+
+        if (!target || isNaN(warnIndex)) {
+            return message.reply('Utilisation : `!delwarn @membre [numéro du warn]` (Exemple: `!delwarn @Nom 1`)');
+        }
+
+        if (!userWarns[target.id] || !userWarns[target.id][warnIndex]) {
+            return message.reply("❌ Ce numéro d'avertissement n'existe pas pour ce membre.");
+        }
+
+        const removed = userWarns[target.id].splice(warnIndex, 1);
+        return message.channel.send(`✅ L'avertissement n°${warnIndex + 1} de **${target.user.username}** a été supprimé avec succès.`);
+    }
+});
+
+// Gestion des boutons de l'alerte de ban (à 3 warns)
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    if (interaction.customId.startsWith('ban_yes_') || interaction.customId.startsWith('ban_no_')) {
+        // Sécurité : Seul toi (le créateur) peux cliquer sur ce bouton de décision
+        if (interaction.user.id !== TON_ID_DISCORD) {
+            return interaction.reply({ content: "Tu n'as pas l'autorisation de valider cette décision.", flags: 64 });
+        }
+
+        const targetId = interaction.customId.split('_')[2];
+        const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+
+        if (interaction.customId.startsWith('ban_yes_')) {
+            if (targetMember) {
+                await targetMember.ban({ reason: "Atteinte de la limite de 3 avertissements." }).catch(() => {});
+                // On remet ses warns à zéro après le ban
+                userWarns[targetId] = [];
+                return interaction.update({ content: `🔨 **${targetMember.user.tag}** a été banni suite aux 3 avertissements.`, components: [] });
+            } else {
+                return interaction.update({ content: "❌ Membre introuvable sur le serveur.", components: [] });
+            }
+        } else {
+            return interaction.update({ content: `❌ Décision annulée. L'utilisateur n'a pas été banni.`, components: [] });
         }
     }
 });
