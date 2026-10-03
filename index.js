@@ -367,5 +367,26 @@ client.on('messageCreate', async message => {
     }
 });
 
+// --- SYSTÈME DE BOOST DE SERVEUR ---
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // ID du rôle de boost sur ton serveur (remplace par le vrai ID du rôle)
+    const roleBoostId = '1555194290106273832'; 
+
+    // Vérifie si le membre vient de booster le serveur (passage de faux à vrai)
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        const role = newMember.guild.roles.cache.get(roleBoostId);
+        if (role) {
+            await newMember.roles.add(role).catch(err => console.error("Erreur d'ajout de rôle boost :", err));
+        }
+
+        // Optionnel : Envoyer un message de remerciement dans un salon général
+        const salonGeneral = newMember.guild.channels.cache.find(c => c.name === '💬chat');
+        if (salonGeneral) {
+            salonGeneral.send(`🎉 Merci infiniment pour le boost du serveur, ${newMember} ! T'assures grave 🚀`);
+        }
+    }
+});
+
+
 // Connexion du bot
 client.login(process.env.DISCORD_TOKEN);
