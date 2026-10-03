@@ -500,6 +500,44 @@ client.on('messageCreate', async message => {
     }
 });
 
+// --- SYSTÈME ANTI-SPAM ---
+const userSpamLog = {}; // Stocke l'historique des messages : { userId: [timestamp1, timestamp2, ...] }
+
+client.on('messageCreate', async message => {
+    // On ignore les bots, les messages hors serveur, et les modérateurs/toi
+    if (!message.guild || message.author.bot) return;
+    if (message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+
+    const userId = message.author.id;
+    const now = Date.now();
+
+    // Si l'utilisateur n'a pas d'historique, on lui en crée un
+    if (!userSpamLog[userId]) {
+        userSpamLog[userId] = [];
+    }
+
+    // On ajoute le message actuel avec l'heure précise
+    userSpamLog[userId].push(now);
+
+    // On ne garde que les messages envoyés au cours des 4 dernières secondes (4000 millisecondes)
+    userSpamLog[userId] = userSpamLog[userId].filter(timestamp => now - timestamp < 4000);
+
+    // Si l'utilisateur a envoyé 5 messages ou plus en moins de 4 secondes -> SPAM !
+    if (userSpamLog[userId].length >= 5) {
+        // On vide son historique pour éviter de le spam-punir en boucle
+        userSpamLog[userId] = [];
+
+        // 1. On supprime son message de spam
+        await message.delete().catch(() => {});
+
+        // 2. On lui envoie un avertissement dans le chat (qui s'efface au bout de 5 secondes)
+        const warningMsg = await message.channel.send(`⚠️ ${message.author}, calme-toi sur le spam !`);
+        setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
+
+        // 3. Optionnel : Tu peux aussi lui mettre un warn automatique dans ton système de warn !
+        // (Si tu veux qu'il prenne un warn direct, tu peux l'ajouter ici)
+    }
+});
 
 
 // Connexion du bot
