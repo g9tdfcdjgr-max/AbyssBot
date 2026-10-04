@@ -40,7 +40,6 @@ function canUseModCommands(member) {
 
 // Fonction pour attribuer automatiquement le rôle de palier selon le niveau
 async function updateLevelRole(member, level) {
-    // Liste de tous les noms de rôles de grades que tu dois créer sur ton serveur Discord
     const gradeRoles = ['Fer', 'Bronze', 'Argent', 'Or', 'Platine', 'Diamant', 'La Fosse', 'Élite', 'Abysses'];
     
     let targetRoleName = 'Fer';
@@ -54,17 +53,23 @@ async function updateLevelRole(member, level) {
     else if (level >= 150) targetRoleName = 'Abysses';
 
     const roleToGive = member.guild.roles.cache.find(r => r.name === targetRoleName);
-    if (!roleToGive) return; // Si le rôle n'existe pas encore sur le serveur, on ignore pour éviter les bugs
-
-    // Retire les anciens rôles de grades pour n'en garder qu'un seul
-    const rolesToRemove = member.roles.cache.filter(r => gradeRoles.includes(r.name) && r.name !== targetRoleName);
-    if (rolesToRemove.size > 0) {
-        await member.roles.remove(rolesToRemove).catch(() => {});
+    if (!roleToGive) {
+        console.log(`❌ ERREUR : Le rôle "${targetRoleName}" est introuvable sur le serveur !`);
+        return;
     }
 
-    // Ajoute le nouveau rôle s'il ne l'a pas déjà
-    if (!member.roles.cache.has(roleToGive.id)) {
-        await member.roles.add(roleToGive).catch(() => {});
+    try {
+        const rolesToRemove = member.roles.cache.filter(r => gradeRoles.includes(r.name) && r.name !== targetRoleName);
+        if (rolesToRemove.size > 0) {
+            await member.roles.remove(rolesToRemove);
+        }
+
+        if (!member.roles.cache.has(roleToGive.id)) {
+            await member.roles.add(roleToGive);
+            console.log(`✅ Succès : Le rôle ${targetRoleName} a bien été attribué à ${member.user.tag} !`);
+        }
+    } catch (error) {
+        console.log(`❌ ERREUR DISCORD lors de l'attribution du rôle :`, error);
     }
 }
 
