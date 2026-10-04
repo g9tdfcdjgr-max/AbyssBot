@@ -289,24 +289,32 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-// =========================================================
-// MESSAGE DE BIENVENUE EN EMBED ROSE
-// =========================================================
+// --- SYSTÈME DE BIENVENUE 100% BLEU AUTOMATIQUE DANS 💬chat ---
 client.on('guildMemberAdd', async member => {
-    const channelName = '💬chat'; 
-    const welcomeChannel = member.guild.channels.cache.find(c => c.name === channelName);
+    // Le bot cherche un salon nommé exactement "💬chat" ou contenant "chat"
+    const channel = member.guild.channels.cache.find(c => 
+        c.isTextBased() && (c.name === '💬chat' || c.name.includes('chat') || c.name.includes('general'))
+    );
+    
+    if (!channel) return;
 
-    if (!welcomeChannel) return;
-
+    // Embed design aux couleurs bleues avec un GIF animé bleu esthétique
     const welcomeEmbed = new EmbedBuilder()
-        .setTitle('✨ Nouveau membre !')
-        .setDescription(`👋 Bienvenue sur le serveur, ${member} ! On est ravis de t'compter parmi nous.`)
-        .setColor('#FF69B4')
-        .setThumbnail(member.user.displayAvatarURL())
+        .setColor('#0099FF') // Bleu électrique intense
+        .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
+        .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment avec nous.\n\n✦ **Rôle :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+        .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1bmtpcTZibXp4aXZrdmEyd3g2aXJ3NXVrcmQydXlkeXlzZWNweiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L1W07mO6r4b04/giphy.gif') // GIF animé bleu stylé
+        .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
-    await welcomeChannel.send({ embeds: [welcomeEmbed] });
+    // Envoi du message stylé dans le salon trouvé
+    await channel.send({ 
+        content: `💙 Bienvenue sur le serveur, ${member} !`, 
+        embeds: [welcomeEmbed] 
+    });
 });
+
     
 // --- COMMANDE !DIRE ---
 client.on('messageCreate', async message => {
