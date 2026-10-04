@@ -104,6 +104,20 @@ async function updateLevelRole(member, level) {
 
 client.on('ready', () => {
     console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
+
+    // Auto-sync des vocaux dès que le bot s'allume pour ne rater personne
+    client.guilds.cache.forEach(guild => {
+        guild.channels.cache.forEach(channel => {
+            if (channel.type === ChannelType.GuildVoice) {
+                channel.members.forEach(member => {
+                    if (!member.user.bot && !voiceJoinTimes[member.id]) {
+                        voiceJoinTimes[member.id] = Date.now();
+                    }
+                });
+            }
+        });
+    });
+    console.log("🎙️ Synchronisation automatique des membres en vocal effectuée au démarrage !");
 });
 
 // =========================================================
@@ -209,6 +223,27 @@ client.on('messageCreate', async message => {
         return;
     }
 
+    // --- COMMANDE !syncvoc (ou s?syncvoc) ---
+    if (command === '!syncvoc' || command === 's?syncvoc') {
+        if (!canUseModCommands(message.member)) {
+            return message.reply("❌ Tu n'as pas la permission d'utiliser cette commande !");
+        }
+
+        let count = 0;
+        message.guild.channels.cache.forEach(channel => {
+            if (channel.type === ChannelType.GuildVoice) {
+                channel.members.forEach(member => {
+                    if (!member.user.bot) {
+                        voiceJoinTimes[member.id] = Date.now();
+                        count++;
+                    }
+                });
+            }
+        });
+
+        return message.reply(`✅ Synchronisation des vocaux réussie ! **${count}** personnes en vocal ont vu leur chrono démarré/réinitialisé.`);
+    }
+
     // Commande !help
     if (command === '!help') {
         const embedHelp = new EmbedBuilder()
@@ -217,6 +252,7 @@ client.on('messageCreate', async message => {
             .setColor('#0099FF')
             .addFields(
                 { name: '🔄 `!sync`', value: 'Compte et synchronise tous les messages de l\'historique du serveur.' },
+                { name: '🎙️ `!syncvoc`', value: 'Force le démarrage du chrono vocal pour tous ceux qui sont actuellement en vocal.' },
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau interactif pour créer un ticket de support.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant pour choisir sa couleur de rôle.' },
                 { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau actuel, ta progression et ton XP.' },
