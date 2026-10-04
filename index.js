@@ -14,7 +14,7 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Serveur web prêt et à l'écoute sur le port ${port}`);
 });
 
-// Initialisation de la base de données SQLite (sauvegardée dans un fichier local)
+// Initialisation de la base de données SQLite
 const db = new sqlite3.Database('./database.sqlite', (err) => {
     if (err) console.error("Erreur de connexion à la base de données :", err.message);
     else console.log("📦 Base de données SQLite connectée avec succès !");
@@ -66,7 +66,6 @@ function canUseModCommands(member) {
     return member.roles.highest.position >= modRole.position;
 }
 
-// Fonction utilitaire pour récupérer ou créer un utilisateur en base
 function getUserData(userId, callback) {
     db.get(`SELECT * FROM stats WHERE userId = ?`, [userId], (err, row) => {
         if (!row) {
@@ -79,7 +78,6 @@ function getUserData(userId, callback) {
     });
 }
 
-// Fonction pour attribuer automatiquement le rôle de palier selon le niveau
 async function updateLevelRole(member, level) {
     const gradeRoles = ['Fer', 'Bronze', 'Argent', 'Or', 'Platine', 'Diamant', 'La Fosse', 'Élite', 'Abysses'];
     
@@ -94,20 +92,14 @@ async function updateLevelRole(member, level) {
     else if (level >= 150) targetRoleName = 'Abysses';
 
     const roleToGive = member.guild.roles.cache.find(r => r.name === targetRoleName);
-    if (!roleToGive) {
-        console.log(`❌ ERREUR : Le rôle "${targetRoleName}" est introuvable sur le serveur !`);
-        return;
-    }
+    if (!roleToGive) return;
 
     try {
         const rolesToRemove = member.roles.cache.filter(r => gradeRoles.includes(r.name) && r.name !== targetRoleName);
-        if (rolesToRemove.size > 0) {
-            await member.roles.remove(rolesToRemove);
-        }
+        if (rolesToRemove.size > 0) await member.roles.remove(rolesToRemove);
 
         if (!member.roles.cache.has(roleToGive.id)) {
             await member.roles.add(roleToGive);
-            console.log(`✅ Succès : Le rôle ${targetRoleName} a bien été attribué à ${member.user.tag} !`);
         }
     } catch (error) {
         console.log(`❌ ERREUR DISCORD lors de l'attribution du rôle :`, error);
@@ -172,6 +164,55 @@ client.on('messageCreate', async message => {
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
 
+    // --- COMMANDE DE SYNCHRONISATION DE L'HISTORIQUE ---
+    if (command === '!sync') {
+        if (!canUseModCommands(message.member)) {
+            return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+        }
+
+        const loadingMsg = await message.channel.send("⏳ Analyse et comptage des messages du serveur en cours... Patiente un instant.");
+        
+        try {
+            const channels = message.guild.channels.cache.filter(c => c.type === ChannelType.GuildText);
+            const messageCounts = {};
+
+            for (const [channelId, channel] of channels) {
+                let lastId = null;
+                let fetched;
+                do {
+                    const options = { limit: 100 };
+                    if (lastId) options.before = lastId;
+                    fetched = await channel.messages.fetch(options).catch(() => null);
+                    if (!fetched || fetched.size === 0) break;
+
+                    fetched.forEach(msg => {
+                        if (!msg.author.bot) {
+                            messageCounts[msg.author.id] = (messageCounts[msg.author.id] || 0) + 1;
+                        }
+                    });
+
+                    lastId = fetched.last().id;
+                } while (fetched.size >= 100);
+            }
+
+            for (const [userId, count] of Object.entries(messageCounts)) {
+                db.get(`SELECT messages FROM stats WHERE userId = ?`, [userId], (err, row) => {
+                    if (!row) {
+                        db.run(`INSERT INTO stats (userId, messages, voiceTime, xp, level) VALUES (?, ?, 0, 0, 1)`, [userId, count]);
+                    } else {
+                        db.run(`UPDATE stats SET messages = ? WHERE userId = ?`, [count, userId]);
+                    }
+                });
+            }
+
+            await loadingMsg.edit("✅ Synchronisation terminée avec succès ! Tous les anciens messages ont été comptés.");
+        } catch (error) {
+            console.error(error);
+            await loadingMsg.edit("❌ Une erreur est survenue lors de la synchronisation.");
+        }
+        return;
+    }
+
     // Commande !help
     if (command === '!help') {
         const embedHelp = new EmbedBuilder()
@@ -179,6 +220,7 @@ client.on('messageCreate', async message => {
             .setDescription('Voici toutes les commandes et fonctionnalités disponibles :')
             .setColor('#0099FF')
             .addFields(
+                { name: '🔄 `!sync`', value: 'Compte tous les messages de l\'historique du serveur.' },
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau pour créer un ticket.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant des rôles de couleur.' },
                 { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau et ton XP.' },
@@ -368,31 +410,6 @@ client.on('messageCreate', async message => {
                 await updateLevelRole(target, newLevel);
                 return message.channel.send(`⭐ Bravo ${target} ! Ton niveau a été défini au **niveau ${newLevel}** par le créateur et ton rôle de grade a été mis à jour ! 🚀`);
             });
-        });
-        return;
-    }
-
-    // Système de points
-    if (command === '!addonepoint') {
-        if (message.author.id !== TON_ID_DISCORD) return message.reply("Permissions insuffisantes.");
-        const target = message.mentions.users.first();
-        if (!target) return message.reply("Mentionne quelqu'un !");
-        
-        db.get(`SELECT points FROM points WHERE userId = ?`, [target.id], (err, row) => {
-            let currentPoints = row ? row.points : 0;
-            currentPoints += 1;
-            db.run(`INSERT OR REPLACE INTO points (userId, points) VALUES (?, ?)`, [target.id, currentPoints], () => {
-                return message.channel.send(`✅ 1 point ajouté à ${target.username}. Total : **${currentPoints} point(s)**.`);
-            });
-        });
-        return;
-    }
-
-    if (command === '!point') {
-        const target = message.mentions.users.first() || message.author;
-        db.get(`SELECT points FROM points WHERE userId = ?`, [target.id], (err, row) => {
-            let p = row ? row.points : 0;
-            return message.channel.send(`🏆 ${target.username} a **${p} point(s)**.`);
         });
         return;
     }
