@@ -1,15 +1,17 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
 const express = require('express');
+
+// --- CONFIGURATION DU SERVEUR WEB POUR RENDER ---
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-  res.send('Abyss Bot est en ligne !');
+    res.send('Abyss Bot est en ligne et actif 24/7 !');
 });
 
-app.listen(port, () => {
-  console.log(`Serveur prêt sur le port ${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Serveur web prêt et à l'écoute sur le port ${port}`);
 });
 
 // Initialisation de la base de données SQLite (sauvegardée dans un fichier local)
@@ -37,15 +39,6 @@ db.serialize(() => {
         userId TEXT PRIMARY KEY,
         points INTEGER DEFAULT 0
     )`);
-});
-
-const http = require('http');
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot Discord actif 24/7 !\n');
-});
-server.listen(process.env.PORT || 3000, () => {
-    console.log('Serveur web prêt pour garder le bot éveillé !');
 });
 
 const client = new Client({
