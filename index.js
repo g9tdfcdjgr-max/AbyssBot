@@ -593,5 +593,42 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         if (salonGeneral) salonGeneral.send(`🎉 Merci infiniment pour le boost du serveur, ${newMember} ! T'assures grave 🚀`);
     }
 });
+// --- SYSTÈME DE COMPTEUR DE VOCAL ---
+const activeVoiceSessions = new Map();
 
+client.on('voiceStateUpdate', async (oldState, newState) => {
+    const member = newState.member;
+    if (!member || member.user.bot) return;
+
+    const userId = member.id;
+    const now = Date.now();
+
+    // Cas 1 : L'utilisateur rejoint un salon vocal
+    if (!oldState.channelId && newState.channelId) {
+        activeVoiceSessions.set(userId, now);
+    }
+    
+    // Cas 2 : L'utilisateur quitte un salon vocal
+    else if (oldState.channelId && !newState.channelId) {
+        const joinTime = activeVoiceSessions.get(userId);
+        if (joinTime) {
+            const timeSpentInSeconds = Math.floor((now - joinTime) / 1000);
+            activeVoiceSessions.delete(userId);
+
+            if (timeSpentInSeconds > 0 && statsCollection) {
+                try {
+                    // Sauvegarde ou mise à jour dans MongoDB
+                    await statsCollection.updateOne(
+                        { userId: userId },
+                        { $inc: { voiceTime: timeSpentInSeconds } },
+                        { upsert: true }
+                    );
+                    console.log(`⏱️ ${member.user.tag} a passé ${timeSpentInSeconds} secondes en voc.`);
+                } catch (error) {
+                    console.error("Erreur lors de la sauvegarde du temps vocal :", error);
+                }
+            }
+        }
+    }
+});
 client.login(process.env.DISCORD_TOKEN);
