@@ -33,6 +33,7 @@ async function connectDB() {
 }
 connectDB();
 
+// Déclaration unique de l'instance client Discord (C'est ICI qu'était l'erreur)
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -218,7 +219,7 @@ client.on('messageCreate', async message => {
                 { name: '🧹 `!clear [nombre]`', value: 'Supprime un nombre précis de messages entre 1 et 100 (Staff).' },
                 { name: '⚠️ `!warn @membre [raison]`', value: 'Avertit un membre (bannissement automatique ou alerte au 3ème warn).' },
                 { name: '📋 `!listwarns @membre`', value: 'Affiche la liste complète des avertissements d\'un membre.' },
-                { name: '🗑️️ `!delwarn @membre [numéro]`', value: 'Supprime un avertissement spécifique d\'un membre.' },
+                { name: '🗑 `!delwarn @membre [numéro]`', value: 'Supprime un avertissement spécifique d\'un membre.' },
                 { name: '🔨 `!ban @membre [raison]`', value: 'Bannit un membre du serveur (Modération).' },
                 { name: '🗣️ `!dire [texte]`', value: 'Fait dire un message au bot en supprimant ta commande.' },
                 { name: '📊 `s?u [@membre]`', value: 'Affiche tes statistiques détaillées (messages et temps vocal).' },
@@ -524,7 +525,7 @@ client.on('interactionCreate', async interaction => {
 
         try {
             await member.roles.add(role);
-            return interaction.editReply({ content: `Félicitations, tu as reçu le rôle couleur **${role.name}** !` });
+            return interaction.editReply({ content: `Félicitations, tu hast reçu le rôle couleur **${role.name}** !` });
         } catch (error) {
             return interaction.editReply({ content: `Erreur : Assure-toi que le rôle du bot Abyss est placé AU-DESSUS des rôles de couleur dans les paramètres Discord !` });
         }
