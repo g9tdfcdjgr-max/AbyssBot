@@ -393,9 +393,17 @@ client.on('messageCreate', async message => {
 
     // Commande !dire
     if (command === '!dire') {
-        const texte = message.content.slice(6);
-        await message.delete().catch(() => {});
-        return message.channel.send(texte);
+        const texte = message.content.slice(6).trim();
+        if (!texte) return message.reply("Utilisation : `!dire [ton texte]`").then(m => setTimeout(() => m.delete().catch(() => {}), 4000));
+        
+        try {
+            // Supprime ton message instantanément
+            await message.delete();
+            // Envoie le message du bot juste après
+            return message.channel.send(texte);
+        } catch (error) {
+            console.error("Erreur avec la commande dire :", error);
+        }
     }
 
     // Commande !level
