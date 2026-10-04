@@ -252,7 +252,7 @@ client.on('messageCreate', async message => {
             .setColor('#0099FF')
             .addFields(
                 { name: '🔄 `!sync`', value: 'Compte et synchronise tous les messages de l\'historique du serveur.' },
-                { name: '🎙️ `!syncvoc`', value: 'Force le démarrage du chrono vocal pour tous ceux qui sont actuellement en vocal.' },
+                { name: '🎙️️ `!syncvoc`', value: 'Force le démarrage du chrono vocal pour tous ceux qui sont actuellement en vocal.' },
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau interactif pour créer un ticket de support.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant pour choisir sa couleur de rôle.' },
                 { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau actuel, ta progression et ton XP.' },
@@ -426,11 +426,17 @@ client.on('messageCreate', async message => {
         return message.channel.send(`⭐ Niveau de ${target} défini à **${newLevel}** !`);
     }
 
-    // Statistiques : s?u
+    // Statistiques : s?u (Calcul en direct du temps vocal inclus !)
     if (command.startsWith('s?u')) {
         const target = message.mentions.members.first() || message.member;
         const stats = await getUserData(target.id);
-        const totalMinutes = stats.voiceTime || 0;
+        
+        let totalMinutes = stats.voiceTime || 0;
+        if (voiceJoinTimes[target.id]) {
+            const currentSessionMinutes = Math.floor((Date.now() - voiceJoinTimes[target.id]) / 60000);
+            totalMinutes += currentSessionMinutes;
+        }
+
         const hours = Math.floor(totalMinutes / 60);
         const mins = totalMinutes % 60;
 
