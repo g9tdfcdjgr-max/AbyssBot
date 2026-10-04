@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
-const sqlite3 = require('sqlite3').verbose();
+const { MongoClient } = require('mongodb');
 const express = require('express');
 
 // --- CONFIGURATION DU SERVEUR WEB POUR RENDER ---
@@ -14,12 +14,24 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Serveur web prêt et à l'écoute sur le port ${port}`);
 });
 
-// Initialisation de la base de données SQLite
-const db = new sqlite3.Database('./database.sqlite', (err) => {
-    if (err) console.error("Erreur de connexion à la base de données :", err.message);
-    else console.log("📦 Base de données SQLite connectée avec succès !");
-});
+// --- CONFIGURATION MONGODB ---
+const uri = process.env.MONGO_URI;
+const client = new MongoClient(uri);
 
+let db, messagesCollection, vocauxCollection;
+
+async function connectDB() {
+    try {
+        await client.connect();
+        db = client.db("AbyssBot");
+        messagesCollection = db.collection("messages");
+        vocauxCollection = db.collection("vocaux");
+        console.log("✅ Connecté à MongoDB avec succès !");
+    } catch (error) {
+        console.error("❌ Erreur de connexion à MongoDB :", error);
+    }
+}
+connectDB();
 // Création des tables si elles n'existent pas
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS stats (
