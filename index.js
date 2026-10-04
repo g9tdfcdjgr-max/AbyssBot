@@ -303,7 +303,7 @@ client.on('guildMemberAdd', async member => {
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
         .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment avec nous.\n\n✦ **Rôle :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-        .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1bmtpcTZibXp4aXZrdmEyd3g2aXJ3NXVrcmQydXlkeXlzZWNweiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L1W07mO6r4b04/giphy.gif') // GIF animé bleu stylé
+        .setImage('1556261065078218762')
         .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
