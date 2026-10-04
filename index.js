@@ -38,6 +38,36 @@ function canUseModCommands(member) {
     return member.roles.highest.position >= modRole.position;
 }
 
+// Fonction pour attribuer automatiquement le rôle de palier selon le niveau
+async function updateLevelRole(member, level) {
+    // Liste de tous les noms de rôles de grades que tu dois créer sur ton serveur Discord
+    const gradeRoles = ['Fer', 'Bronze', 'Argent', 'Or', 'Platine', 'Diamant', 'La Fosse', 'Élite', 'Abysses'];
+    
+    let targetRoleName = 'Fer';
+    if (level >= 10 && level < 30) targetRoleName = 'Bronze';
+    else if (level >= 30 && level < 40) targetRoleName = 'Argent';
+    else if (level >= 40 && level < 60) targetRoleName = 'Or';
+    else if (level >= 60 && level < 80) targetRoleName = 'Platine';
+    else if (level >= 80 && level < 100) targetRoleName = 'Diamant';
+    else if (level >= 100 && level < 120) targetRoleName = 'La Fosse';
+    else if (level >= 120 && level < 150) targetRoleName = 'Élite';
+    else if (level >= 150) targetRoleName = 'Abysses';
+
+    const roleToGive = member.guild.roles.cache.find(r => r.name === targetRoleName);
+    if (!roleToGive) return; // Si le rôle n'existe pas encore sur le serveur, on ignore pour éviter les bugs
+
+    // Retire les anciens rôles de grades pour n'en garder qu'un seul
+    const rolesToRemove = member.roles.cache.filter(r => gradeRoles.includes(r.name) && r.name !== targetRoleName);
+    if (rolesToRemove.size > 0) {
+        await member.roles.remove(rolesToRemove).catch(() => {});
+    }
+
+    // Ajoute le nouveau rôle s'il ne l'a pas déjà
+    if (!member.roles.cache.has(roleToGive.id)) {
+        await member.roles.add(roleToGive).catch(() => {});
+    }
+}
+
 client.on('ready', () => {
     console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
 });
@@ -86,11 +116,16 @@ client.on('messageCreate', async message => {
         userXp[message.author.id] = { xp: 0, level: 1 };
     }
     const userData = userXp[message.author.id];
-    userData.xp += Math.floor(Math.random() * 10) + 15; // Gagne entre 15 et 25 XP par message
-    const xpNeeded = userData.level * 100;
+    userData.xp += Math.floor(Math.random() * 3) + 2;
+    const xpNeeded = userData.level * userData.level * 50;
+    
     if (userData.xp >= xpNeeded) {
         userData.xp -= xpNeeded;
         userData.level += 1;
+        
+        // Met à jour les rôles automatiquement lors du passage de niveau
+        await updateLevelRole(message.member, userData.level);
+
         message.channel.send(`🎉 Félicitations ${message.author}, tu passes au **niveau ${userData.level}** ! 🚀`).catch(() => {});
     }
 
@@ -106,12 +141,12 @@ client.on('messageCreate', async message => {
             .addFields(
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau pour créer un ticket.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant des rôles de couleur.' },
-                { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau ou celui d\'un membre.' },
+                { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau et ton XP.' },
                 { name: '🛠️ `!setlevel @membre [niveau]`', value: 'Définit le niveau d\'un membre (Créateur).' },
                 { name: '🧹 `!clear [nombre]`', value: 'Supprime un nombre de messages (Staff).' },
                 { name: '⚠️ `!warn @membre [raison]`', value: 'Avertit un membre du serveur.' },
                 { name: '📋 `!listwarns @membre`', value: 'Affiche les avertissements d\'un membre.' },
-                { name: '🗑️️ `!delwarn @membre [numéro]`', value: 'Supprime un avertissement.' },
+                { name: '🗑️ `!delwarn @membre [numéro]`', value: 'Supprime un avertissement.' },
                 { name: '🔨 `!ban @membre [raison]`', value: 'Bannit un membre du serveur.' },
                 { name: '📊 `s?u`', value: 'Affiche tes statistiques.' },
                 { name: '🏆 `s?topmsg` / `s?topvoc`', value: 'Affiche les classements.' }
@@ -204,7 +239,7 @@ client.on('messageCreate', async message => {
         userWarns[target.id].push({ reason, moderator: message.author.tag });
         const totalWarns = userWarns[target.id].length;
 
-        await message.channel.send(`⚠️️ **${target}** a reçu un avertissement. (Total : **${totalWarns}/3**) \nRaison : ${reason}`);
+        await message.channel.send(`⚠️ **${target}** a reçu un avertissement. (Total : **${totalWarns}/3**) \nRaison : ${reason}`);
 
         if (totalWarns >= 3) {
             const row = new ActionRowBuilder().addComponents(
@@ -268,7 +303,7 @@ client.on('messageCreate', async message => {
         return message.channel.send({ embeds: [embedLevel] });
     }
 
-    // Commande !setlevel (Réservé au créateur du bot pour féliciter / donner des niveaux aux modos)
+    // Commande !setlevel (Modifie le niveau ET attribue automatiquement le rôle correspondant)
     if (command === '!setlevel') {
         if (message.author.id !== TON_ID_DISCORD) {
             return message.reply("Seul le créateur du bot peut utiliser cette commande !");
@@ -277,14 +312,17 @@ client.on('messageCreate', async message => {
         const newLevel = parseInt(args[2]);
 
         if (!target || isNaN(newLevel) || newLevel < 1) {
-            return message.reply("Utilisation correcte : `!setlevel @membre [niveau]` (Exemple : `!setlevel @Modo 5`)");
+            return message.reply("Utilisation correcte : `!setlevel @membre [niveau]` (Exemple : `!setlevel @Modo 45`)");
         }
 
         if (!userXp[target.id]) userXp[target.id] = { xp: 0, level: 1 };
         userXp[target.id].level = newLevel;
-        userXp[target.id].xp = 0; // Remet l'XP du palier à 0 proprement
+        userXp[target.id].xp = 0;
 
-        return message.channel.send(`⭐ Bravo ${target} ! Ton niveau a été défini directement au **niveau ${newLevel}** par le créateur ! 🚀`);
+        // Attribue le rôle de grade correspondant à ce nouveau niveau
+        await updateLevelRole(target, newLevel);
+
+        return message.channel.send(`⭐ Bravo ${target} ! Ton niveau a été défini au **niveau ${newLevel}** par le créateur et ton rôle de grade a été mis à jour ! 🚀`);
     }
 
     // Système de points
@@ -455,7 +493,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-// Accueil Nouveau Membre (100% Bleu avec GIF)
+// Accueil Nouveau Membre (100% Bleu avec image)
 client.on('guildMemberAdd', async member => {
     const channelId = '1554966441462337608'; 
     const channel = member.guild.channels.cache.get(channelId);
@@ -466,7 +504,7 @@ client.on('guildMemberAdd', async member => {
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
         .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment parmi nous.\n\n✦ **Rôle :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-        .setImage('https://cdn.discordapp.com/attachments/1517488205694369864/1556267670213758996/image.png?backend=b2&ex=6ac38ab6&is=6ac23936&hm=86358401616f24db66c9f82a0b2af215a0ccd9fcbf2706f77e724887306e5c3a&')
+        .setImage('https://media1.tenor.com/m/3mK91TaNomQAAAAC/surprise-girl.gif')
         .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
