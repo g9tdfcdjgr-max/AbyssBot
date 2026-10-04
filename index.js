@@ -1,6 +1,7 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { MongoClient } = require('mongodb');
 const express = require('express');
+
 // ID du salon pour les boosts
 const BOOST_CHANNEL_ID = "1554966441462337608";
 
@@ -17,12 +18,11 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 // --- CONFIGURATION MONGODB ---
-// --- CONFIGURATION MONGODB ---
 const uri = process.env.MONGO_URI;
 const mongoClient = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000,
     tls: true,
-    tlsAllowInvalidCertificates: true // Contourne temporairement le blocage SSL de Render
+    tlsAllowInvalidCertificates: true
 });
 
 let db, statsCollection, warnsCollection;
@@ -40,7 +40,6 @@ async function connectDB() {
 }
 connectDB();
 
-// Déclaration unique de l'instance client Discord (C'est ICI qu'était l'erreur)
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -141,7 +140,6 @@ client.on('messageCreate', async message => {
         return;
     }
 
-    // Gestion base de données messages & XP
     const userData = await getUserData(message.author.id);
     let newMessages = userData.messages + 1;
     let newXp = userData.xp + (Math.floor(Math.random() * 3) + 2);
@@ -164,7 +162,7 @@ client.on('messageCreate', async message => {
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
 
-    // --- COMMANDE DE SYNCHRONISATION DE L'HISTORIQUE ---
+    // --- COMMANDE !sync ---
     if (command === '!sync') {
         if (!canUseModCommands(message.member)) {
             return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
@@ -218,20 +216,20 @@ client.on('messageCreate', async message => {
             .setDescription('Voici toutes les commandes et fonctionnalités disponibles sur le bot :')
             .setColor('#0099FF')
             .addFields(
-                { name: '🔄 `!sync`', value: 'Compte et synchronise tous les messages de l\'historique du serveur dans la base de données.' },
+                { name: '🔄 `!sync`', value: 'Compte et synchronise tous les messages de l\'historique du serveur.' },
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau interactif pour créer un ticket de support.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant pour choisir sa couleur de rôle.' },
                 { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau actuel, ta progression et ton XP.' },
-                { name: '🛠️ `!setlevel @membre [niveau]`', value: 'Définit manuellement le niveau d\'un membre (Réservé au Créateur).' },
-                { name: '🧹 `!clear [nombre]`', value: 'Supprime un nombre précis de messages entre 1 et 100 (Staff).' },
-                { name: '⚠️ `!warn @membre [raison]`', value: 'Avertit un membre (bannissement automatique ou alerte au 3ème warn).' },
-                { name: '📋 `!listwarns @membre`', value: 'Affiche la liste complète des avertissements d\'un membre.' },
-                { name: '🗑 `!delwarn @membre [numéro]`', value: 'Supprime un avertissement spécifique d\'un membre.' },
-                { name: '🔨 `!ban @membre [raison]`', value: 'Bannit un membre du serveur (Modération).' },
-                { name: '🗣️ `!dire [texte]`', value: 'Fait dire un message au bot en supprimant ta commande.' },
-                { name: '📊 `s?u [@membre]`', value: 'Affiche tes statistiques détaillées (messages et temps vocal).' },
-                { name: '🏆 `s?topmsg`', value: 'Affiche le classement des membres les plus actifs par message.' },
-                { name: '🎙️ `s?topvoc`', value: 'Affiche le classement des membres ayant passé le plus de temps en vocal.' }
+                { name: '🛠️ `!setlevel @membre [niveau]`', value: 'Définit manuellement le niveau d\'un membre.' },
+                { name: '🧹 `!clear [nombre]`', value: 'Supprime un nombre précis de messages (Staff).' },
+                { name: '⚠️ `!warn @membre [raison]`', value: 'Avertit un membre.' },
+                { name: '📋 `!listwarns @membre`', value: 'Affiche la liste des avertissements.' },
+                { name: '🗑 `!delwarn @membre [numéro]`', value: 'Supprime un avertissement.' },
+                { name: '🔨 `!ban @membre [raison]`', value: 'Bannit un membre.' },
+                { name: '🗣️ `!dire [texte]`', value: 'Fait dire un message au bot.' },
+                { name: '📊 `s?u [@membre]`', value: 'Affiche tes statistiques détaillées.' },
+                { name: '🏆 `s?topmsg`', value: 'Classement des messages.' },
+                { name: '🎙️ `s?topvoc`', value: 'Classement du temps vocal.' }
             )
             .setFooter({ text: 'Bot Abyss • Système complet de gestion et sécurité' });
         return message.channel.send({ embeds: [embedHelp] });
@@ -247,7 +245,7 @@ client.on('messageCreate', async message => {
         );
         const embed = new EmbedBuilder()
             .setTitle('🎟️ Support & Tickets Abyss')
-            .setDescription('Besoin d\'aide, d\'une assistance ou d\'un contact direct avec la modération ? Clique sur le bouton ci-dessous pour ouvrir un salon de ticket privé et sécurisé.')
+            .setDescription('Besoin d\'aide ? Clique sur le bouton ci-dessous pour ouvrir un salon de ticket privé.')
             .setColor('#0099FF');
         await message.delete().catch(() => {});
         return message.channel.send({ embeds: [embed], components: [row] });
@@ -262,17 +260,17 @@ client.on('messageCreate', async message => {
             new StringSelectMenuBuilder()
                 .setCustomId('select_color_role')
                 .setPlaceholder('🎨 Choisis ta couleur de profil...')
-                .addOptions(
-                    new StringSelectMenuOptionBuilder().setLabel('Bleu').setValue('Bleu').setDescription('Obtiens le rôle couleur Bleu'),
-                    new StringSelectMenuOptionBuilder().setLabel('Rouge').setValue('Rouge').setDescription('Obtiens le rôle couleur Rouge'),
-                    new StringSelectMenuOptionBuilder().setLabel('Vert').setValue('Vert').setDescription('Obtiens le rôle couleur Vert'),
-                    new StringSelectMenuOptionBuilder().setLabel('Violet').setValue('Violet').setDescription('Obtiens le rôle couleur Violet'),
-                    new StringSelectMenuOptionBuilder().setLabel('Rose').setValue('Rose').setDescription('Obtiens le rôle couleur Rose')
-                )
+                .addOptions([
+                    { label: 'Bleu', value: 'Bleu', description: 'Obtiens le rôle couleur Bleu' },
+                    { label: 'Rouge', value: 'Rouge', description: 'Obtiens le rôle couleur Rouge' },
+                    { label: 'Vert', value: 'Vert', description: 'Obtiens le rôle couleur Vert' },
+                    { label: 'Violet', value: 'Violet', description: 'Obtiens le rôle couleur Violet' },
+                    { label: 'Rose', value: 'Rose', description: 'Obtiens le rôle couleur Rose' }
+                ])
         );
         const embed = new EmbedBuilder()
             .setTitle('🎨 Choix de ton rôle couleur personnalisé')
-            .setDescription('Sélectionne une couleur dans le menu déroulant ci-dessous pour changer l\'apparence de ton pseudo sur le serveur !')
+            .setDescription('Sélectionne une couleur dans le menu déroulant ci-dessous !')
             .setColor('#0099FF');
         await message.delete().catch(() => {});
         return message.channel.send({ embeds: [embed], components: [row] });
@@ -280,20 +278,16 @@ client.on('messageCreate', async message => {
 
     // Commande !clear
     if (command === '!clear') {
-        if (!canUseModCommands(message.member)) {
-            return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
-        }
+        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const count = parseInt(args[1]);
-        if (isNaN(count) || count < 1 || count > 100) {
-            return message.reply("Précise un nombre de messages à supprimer entre 1 et 100 ! Exemple : `!clear 10`");
-        }
+        if (isNaN(count) || count < 1 || count > 100) return message.reply("Précise un nombre entre 1 et 100 !");
         try {
             await message.delete().catch(() => {});
             const deleted = await message.channel.bulkDelete(count, true);
-            const confirmation = await message.channel.send(`🧹 **${deleted.size}** messages ont été nettoyés avec succès !`);
+            const confirmation = await message.channel.send(`🧹 **${deleted.size}** messages nettoyés !`);
             setTimeout(() => confirmation.delete().catch(() => {}), 4000);
         } catch (error) {
-            return message.reply("Erreur : Je ne peux pas supprimer des messages de plus de 14 jours en raison des limitations de l'API Discord.");
+            return message.reply("Erreur : Impossible de supprimer des messages de plus de 14 jours.");
         }
         return;
     }
@@ -302,29 +296,27 @@ client.on('messageCreate', async message => {
     if (command === '!ban') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) return;
         const target = message.mentions.members.first();
-        if (!target) return message.reply('Utilisation correcte : `!ban @membre [raison]`');
-        const reason = args.slice(2).join(' ') || 'Aucune raison spécifiée';
+        if (!target) return message.reply('Utilisation : `!ban @membre [raison]`');
+        const reason = args.slice(2).join(' ') || 'Aucune raison';
         try {
             await target.ban({ reason });
-            return message.channel.send(`🔨 **${target.user.tag}** a été banni du serveur. Raison : *${reason}*`);
+            return message.channel.send(`🔨 **${target.user.tag}** a été banni. Raison : *${reason}*`);
         } catch (error) {
-            return message.reply("Je n'ai pas pu bannir ce membre (vérifie ma position dans la liste des rôles).");
+            return message.reply("Je n'ai pas pu bannir ce membre.");
         }
     }
 
     // Commande !warn
     if (command === '!warn') {
-        if (!canUseModCommands(message.member)) {
-            return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
-        }
+        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const target = message.mentions.members.first();
-        if (!target) return message.reply('Utilisation correcte : `!warn @membre [raison]`');
-        const reason = args.slice(2).join(' ') || 'Aucune raison spécifiée';
+        if (!target) return message.reply('Utilisation : `!warn @membre [raison]`');
+        const reason = args.slice(2).join(' ') || 'Aucune raison';
 
         await warnsCollection.insertOne({ userId: target.id, reason, moderator: message.author.tag, date: new Date() });
         const totalWarns = await warnsCollection.countDocuments({ userId: target.id });
 
-        await message.channel.send(`⚠️ **${target}** a reçu un avertissement de la part de **${message.author.tag}**. (Total : **${totalWarns}/3**) \nRaison : *${reason}*`);
+        await message.channel.send(`⚠️ **${target}** a reçu un avertissement (**${totalWarns}/3**). Raison : *${reason}*`);
 
         if (totalWarns >= 3) {
             const rowAction = new ActionRowBuilder().addComponents(
@@ -332,7 +324,7 @@ client.on('messageCreate', async message => {
                 new ButtonBuilder().setCustomId(`ban_no_${target.id}`).setLabel('❌ Ignorer').setStyle(ButtonStyle.Secondary)
             );
             await message.channel.send({
-                content: `<@${TON_ID_DISCORD}> 🚨 **Alerte de sécurité** : ${target.user.tag} a atteint ou dépassé **3 avertissements** ! Veux-tu procéder à son bannissement ?`,
+                content: `<@${TON_ID_DISCORD}> 🚨 **Alerte** : ${target.user.tag} a atteint 3 warns !`,
                 components: [rowAction]
             });
         }
@@ -341,30 +333,26 @@ client.on('messageCreate', async message => {
 
     // Commande !listwarns
     if (command === '!listwarns') {
-        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const target = message.mentions.members.first() || message.member;
         const rows = await warnsCollection.find({ userId: target.id }).toArray();
-        
-        if (!rows || rows.length === 0) return message.channel.send(`✅ **${target.user.username}** possède un casier vierge (aucun avertissement).`);
-        const list = rows.map((w, index) => `**#${index + 1}** — Raison : *${w.reason}* (Ajouté par ${w.moderator})`).join('\n');
+        if (!rows || rows.length === 0) return message.channel.send(`✅ **${target.user.username}** a un casier vierge.`);
+        const list = rows.map((w, index) => `**#${index + 1}** — Raison : *${w.reason}*`).join('\n');
         const embedWarns = new EmbedBuilder().setTitle(`📋 Avertissements de ${target.user.username}`).setDescription(list).setColor('#FFA500');
         return message.channel.send({ embeds: [embedWarns] });
     }
 
     // Commande !delwarn
     if (command === '!delwarn') {
-        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
+        if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const target = message.mentions.members.first();
         const warnIndex = parseInt(args[2]);
-        if (!target || isNaN(warnIndex)) {
-            return message.reply('Utilisation correcte : `!delwarn @membre [numéro]`');
-        }
+        if (!target || isNaN(warnIndex)) return message.reply('Utilisation : `!delwarn @membre [numéro]`');
         const rows = await warnsCollection.find({ userId: target.id }).toArray();
-        if (!rows || !rows[warnIndex - 1]) return message.reply("Avertissement introuvable avec ce numéro.");
+        if (!rows || !rows[warnIndex - 1]) return message.reply("Avertissement introuvable.");
         
-        const warnToDelete = rows[warnIndex - 1];
-        await warnsCollection.deleteOne({ _id: warnToDelete._id });
-        return message.channel.send(`✅ L'avertissement n°${warnIndex} concernant **${target.user.username}** a été supprimé avec succès.`);
+        await warnsCollection.deleteOne({ _id: rows[warnIndex - 1]._id });
+        return message.channel.send(`✅ Avertissement n°${warnIndex} supprimé pour **${target.user.username}**.`);
     }
 
     // Commande !dire
@@ -374,17 +362,17 @@ client.on('messageCreate', async message => {
         return message.channel.send(texte);
     }
 
-    // Système de niveaux (!level / !lvl)
+    // Commande !level
     if (command === '!level' || command === '!lvl') {
         const target = message.mentions.members.first() || message.member;
         const data = await getUserData(target.id);
         const needed = data.level * data.level * 50;
         const embedLevel = new EmbedBuilder()
-            .setTitle(`⭐ Niveau et Progression de ${target.user.username}`)
+            .setTitle(`⭐ Niveau de ${target.user.username}`)
             .setColor('#0099FF')
             .addFields(
-                { name: '📈 Niveau Actuel', value: `${data.level}`, inline: true },
-                { name: '✨ Expérience (XP)', value: `${data.xp} / ${needed} XP`, inline: true }
+                { name: '📈 Niveau', value: `${data.level}`, inline: true },
+                { name: '✨ XP', value: `${data.xp} / ${needed} XP`, inline: true }
             )
             .setThumbnail(target.user.displayAvatarURL());
         return message.channel.send({ embeds: [embedLevel] });
@@ -392,38 +380,30 @@ client.on('messageCreate', async message => {
 
     // Commande !setlevel
     if (command === '!setlevel') {
-        if (message.author.id !== TON_ID_DISCORD) {
-            return message.reply("Seul le créateur du bot possède les droits pour utiliser cette commande !");
-        }
+        if (message.author.id !== TON_ID_DISCORD) return message.reply("Seul le créateur peut faire ça !");
         const target = message.mentions.members.first();
         const newLevel = parseInt(args[2]);
+        if (!target || isNaN(newLevel) || newLevel < 1) return message.reply("Utilisation : `!setlevel @membre [niveau]`");
 
-        if (!target || isNaN(newLevel) || newLevel < 1) {
-            return message.reply("Utilisation correcte : `!setlevel @membre [niveau]` (Exemple : `!setlevel @Membre 45`)");
-        }
-
-        await statsCollection.updateOne(
-            { userId: target.id },
-            { $set: { level: newLevel, xp: 0 } },
-            { upsert: true }
-        );
+        await statsCollection.updateOne({ userId: target.id }, { $set: { level: newLevel, xp: 0 } }, { upsert: true });
         await updateLevelRole(target, newLevel);
-        return message.channel.send(`⭐ Succès ! Le niveau de ${target} a été défini au **niveau ${newLevel}** par le créateur et son rôle de grade a été actualisé ! 🚀`);
+        return message.channel.send(`⭐ Niveau de ${target} défini à **${newLevel}** !`);
     }
 
     // Statistiques : s?u
     if (command.startsWith('s?u')) {
         const target = message.mentions.members.first() || message.member;
         const stats = await getUserData(target.id);
-        const hours = Math.floor(stats.voiceTime / 60);
-        const mins = stats.voiceTime % 60;
+        const totalMinutes = stats.voiceTime || 0;
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
 
         const embedStats = new EmbedBuilder()
-            .setTitle(`📊 Statistiques détaillées de ${target.user.username}`)
+            .setTitle(`📊 Statistiques de ${target.user.username}`)
             .setColor('#00FF7F')
             .addFields(
-                { name: '💬 Messages envoyés', value: `${stats.messages}`, inline: true },
-                { name: '🎙️ Temps total en vocal', value: `${hours}h ${mins}m`, inline: true }
+                { name: '💬 Messages', value: `${stats.messages}`, inline: true },
+                { name: '🎙️ Temps vocal', value: `${hours}h ${mins}m`, inline: true }
             )
             .setThumbnail(target.user.displayAvatarURL());
         return message.channel.send({ embeds: [embedStats] });
@@ -431,20 +411,20 @@ client.on('messageCreate', async message => {
 
     if (command === 's?topmsg') {
         const rows = await statsCollection.find().sort({ messages: -1 }).limit(10).toArray();
-        if (!rows || rows.length === 0) return message.channel.send('Aucune donnée enregistrée pour le moment.');
+        if (!rows || rows.length === 0) return message.channel.send('Aucune donnée.');
         const leaderboard = rows.map((data, i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${data.messages}** messages`).join('\n');
-        const embed = new EmbedBuilder().setTitle('🏆 Top 10 — Messages du serveur').setColor('#F1C40F').setDescription(leaderboard);
+        const embed = new EmbedBuilder().setTitle('🏆 Top 10 — Messages').setColor('#F1C40F').setDescription(leaderboard);
         return message.channel.send({ embeds: [embed] });
     }
 
     if (command === 's?topvoc') {
         const rows = await statsCollection.find().sort({ voiceTime: -1 }).limit(10).toArray();
-        if (!rows || rows.length === 0) return message.channel.send('Aucune donnée enregistrée pour le moment.');
+        if (!rows || rows.length === 0) return message.channel.send('Aucune donnée.');
         const leaderboard = rows.map((data, i) => {
             const h = Math.floor(data.voiceTime / 60), m = data.voiceTime % 60;
-            return `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${h}h ${m}m** en vocal`;
+            return `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${h}h ${m}m**`;
         }).join('\n');
-        const embed = new EmbedBuilder().setTitle('🎙️ Top 10 — Temps Vocal du serveur').setColor('#3498DB').setDescription(leaderboard);
+        const embed = new EmbedBuilder().setTitle('🎙️ Top 10 — Temps Vocal').setColor('#3498DB').setDescription(leaderboard);
         return message.channel.send({ embeds: [embed] });
     }
 });
@@ -454,19 +434,17 @@ client.on('messageCreate', async message => {
 // =========================================================
 client.on('interactionCreate', async interaction => {
     if (interaction.isButton() && (interaction.customId.startsWith('ban_yes_') || interaction.customId.startsWith('ban_no_'))) {
-        if (interaction.user.id !== TON_ID_DISCORD) {
-            return interaction.reply({ content: "Seul le créateur du bot peut interagir avec ces boutons de sanction !", flags: 64 });
-        }
+        if (interaction.user.id !== TON_ID_DISCORD) return interaction.reply({ content: "Réservé au créateur !", flags: 64 });
         const targetId = interaction.customId.split('_')[2];
         if (interaction.customId.startsWith('ban_yes_')) {
             try {
-                await interaction.guild.members.ban(targetId, { reason: "Atteint la limite de 3 avertissements." });
-                await interaction.update({ content: `🔨 Le membre a été banni avec succès suite aux alertes.`, components: [] });
+                await interaction.guild.members.ban(targetId, { reason: "Atteint 3 avertissements." });
+                await interaction.update({ content: `🔨 Membre banni.`, components: [] });
             } catch (err) {
-                await interaction.reply({ content: "Erreur : Impossible de bannir ce membre.", flags: 64 });
+                await interaction.reply({ content: "Erreur de bannissement.", flags: 64 });
             }
         } else {
-            await interaction.update({ content: `❌ Alerte de sanction ignorée par le créateur.`, components: [] });
+            await interaction.update({ content: `❌ Alerte ignorée.`, components: [] });
         }
         return;
     }
@@ -476,7 +454,7 @@ client.on('interactionCreate', async interaction => {
         const channelName = `ticket-${interaction.user.username}`.toLowerCase();
 
         if (guild.channels.cache.find(c => c.name === channelName)) {
-            return interaction.reply({ content: 'Tu possèdes déjà un ticket de support ouvert sur le serveur !', flags: 64 });
+            return interaction.reply({ content: 'Tu as déjà un ticket ouvert !', flags: 64 });
         }
 
         const channel = await guild.channels.create({
@@ -493,19 +471,17 @@ client.on('interactionCreate', async interaction => {
             new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 Fermer le ticket').setStyle(ButtonStyle.Danger)
         );
 
-        await channel.send({ content: `Bonjour ${interaction.user}, un membre de l'équipe de modération va bientôt prendre en charge ton ticket.`, components: [row] });
-        return interaction.reply({ content: `Votre ticket a été créé avec succès : ${channel}`, flags: 64 });
+        await channel.send({ content: `Bonjour ${interaction.user}, un modérateur va t'aider.`, components: [row] });
+        return interaction.reply({ content: `Ticket créé : ${channel}`, flags: 64 });
     }
 
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
         const isOwner = interaction.user.id === TON_ID_DISCORD;
         const isMod = interaction.member.roles.cache.has(ROLE_MOD_ID);
 
-        if (!isOwner && !isMod) {
-            return interaction.reply({ content: "Tu n'as pas la permission de fermer ce ticket de support !", flags: 64 });
-        }
+        if (!isOwner && !isMod) return interaction.reply({ content: "Pas la permission !", flags: 64 });
 
-        await interaction.reply({ content: 'Fermeture et suppression du salon de ticket en cours (dans 3 secondes)...' });
+        await interaction.reply({ content: 'Fermeture du ticket dans 3 secondes...' });
         setTimeout(async () => {
             await interaction.channel.delete().catch(() => {});
         }, 3000);
@@ -514,60 +490,64 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'select_color_role') {
         await interaction.deferReply({ flags: 64 });
-
         const selectedRoleName = interaction.values[0];
         const role = interaction.guild.roles.cache.find(r => r.name === selectedRoleName);
 
-        if (!role) {
-            return interaction.editReply({ content: `Le rôle **${selectedRoleName}** n'existe pas encore sur ce serveur. Demande à un administrateur de le créer !` });
-        }
+        if (!role) return interaction.editReply({ content: `Le rôle ${selectedRoleName} n'existe pas.` });
 
         const member = interaction.member;
         const colorRoles = ['Rose', 'Bleu', 'Rouge', 'Vert', 'Violet'];
-
         const rolesToRemove = member.roles.cache.filter(r => colorRoles.includes(r.name));
-        if (rolesToRemove.size > 0) {
-            await member.roles.remove(rolesToRemove).catch(() => {});
-        }
+        if (rolesToRemove.size > 0) await member.roles.remove(rolesToRemove).catch(() => {});
 
         try {
             await member.roles.add(role);
-            return interaction.editReply({ content: `Félicitations, tu hast reçu le rôle couleur **${role.name}** !` });
+            return interaction.editReply({ content: `Rôle **${role.name}** attribué !` });
         } catch (error) {
-            return interaction.editReply({ content: `Erreur : Assure-toi que le rôle du bot Abyss est placé AU-DESSUS des rôles de couleur dans les paramètres Discord !` });
+            return interaction.editReply({ content: `Erreur : Vérifie la hiérarchie des rôles du bot.` });
         }
     }
 });
 
 // =========================================================
-// SUIVI VOCAL & ÉVÉNEMENTS MEMBRES
+// SUIVI VOCAL
 // =========================================================
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    const userId = newState.id || oldState.id;
-    if (newState.member?.user.bot) return;
+    const member = newState.member || oldState.member;
+    if (!member || member.user.bot) return;
 
+    const userId = member.id;
+    const now = Date.now();
+
+    // Rejoint un salon vocal
     if (!oldState.channelId && newState.channelId) {
-        voiceJoinTimes[userId] = Date.now();
+        voiceJoinTimes[userId] = now;
     }
-    if (oldState.channelId && !newState.channelId) {
+    // Quitte un salon vocal
+    else if (oldState.channelId && !newState.channelId) {
         if (voiceJoinTimes[userId]) {
-            const minutes = Math.floor((Date.now() - voiceJoinTimes[userId]) / 60000);
+            const minutes = Math.floor((now - voiceJoinTimes[userId]) / 60000);
             delete voiceJoinTimes[userId];
 
-            if (minutes > 0) {
-                const stats = await getUserData(userId);
-                const newVoiceTime = stats.voiceTime + minutes;
-                await statsCollection.updateOne(
-                    { userId },
-                    { $set: { voiceTime: newVoiceTime } },
-                    { upsert: true }
-                );
+            if (minutes > 0 && statsCollection) {
+                try {
+                    await statsCollection.updateOne(
+                        { userId },
+                        { $inc: { voiceTime: minutes } },
+                        { upsert: true }
+                    );
+                    console.log(`⏱️ ${member.user.tag} a passé ${minutes} minutes en voc.`);
+                } catch (error) {
+                    console.error("Erreur sauvegarde vocal :", error);
+                }
             }
         }
     }
 });
 
-// Accueil Nouveau Membre
+// =========================================================
+// ARRIVÉE DES MEMBRES & BOOSTS
+// =========================================================
 client.on('guildMemberAdd', async member => {
     const channelId = '1554966441462337608'; 
     const channel = member.guild.channels.cache.get(channelId);
@@ -576,73 +556,27 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
         .setColor('#0099FF')
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
-        .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment parmi nous.\n\n✦ **Rôle par défaut :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
+        .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-        .setImage('https://cdn.discordapp.com/attachments/1517488205694369864/1556273762876391554/surprise-girl.gif')
-        .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
     await channel.send({ content: `💙 Bienvenue sur le serveur, ${member} !`, embeds: [welcomeEmbed] });
 });
 
-// Rôle de Boost auto
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const roleBoostId = '1555194290106273832'; 
-    if (!oldMember.premiumSince && newMember.premiumSince) {
-        const role = newMember.guild.roles.cache.get(roleBoostId);
-        if (role) await newMember.roles.add(role).catch(() => {});
-        const salonGeneral = newMember.guild.channels.cache.find(c => c.name.includes('chat'));
-        if (salonGeneral) salonGeneral.send(`🎉 Merci infiniment pour le boost du serveur, ${newMember} ! T'assures grave 🚀`);
-    }
-});
-// --- SYSTÈME DE COMPTEUR DE VOCAL ---
-const activeVoiceSessions = new Map();
-
-client.on('voiceStateUpdate', async (oldState, newState) => {
-    const member = newState.member;
-    if (!member || member.user.bot) return;
-
-    const userId = member.id;
-    const now = Date.now();
-
-    // Cas 1 : L'utilisateur rejoint un salon vocal
-    if (!oldState.channelId && newState.channelId) {
-        activeVoiceSessions.set(userId, now);
-    }
-    
-    // Cas 2 : L'utilisateur quitte un salon vocal
-    else if (oldState.channelId && !newState.channelId) {
-        const joinTime = activeVoiceSessions.get(userId);
-        if (joinTime) {
-            const timeSpentInSeconds = Math.floor((now - joinTime) / 1000);
-            activeVoiceSessions.delete(userId);
-
-            if (timeSpentInSeconds > 0 && statsCollection) {
-                try {
-                    // Sauvegarde ou mise à jour dans MongoDB
-                    await statsCollection.updateOne(
-                        { userId: userId },
-                        { $inc: { voiceTime: timeSpentInSeconds } },
-                        { upsert: true }
-                    );
-                    console.log(`⏱️ ${member.user.tag} a passé ${timeSpentInSeconds} secondes en voc.`);
-                } catch (error) {
-                    console.error("Erreur lors de la sauvegarde du temps vocal :", error);
-                }
-            }
-        }
-    }
-});
-// --- SYSTÈMES DE BOOST ---
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const oldBoost = oldMember.premiumSince;
     const newBoost = newMember.premiumSince;
 
     if (!oldBoost && newBoost) {
-        const channel = newMember.guild.channels.cache.get(BOOST_CHANNEL_ID);
-        if (!channel) return;
+        const role = newMember.guild.roles.cache.get(roleBoostId);
+        if (role) await newMember.roles.add(role).catch(() => {});
 
-        channel.send(`🎉 Merci à ${newMember} d'avoir boosté le serveur ! 🚀`);
+        const channel = newMember.guild.channels.cache.get(BOOST_CHANNEL_ID);
+        if (channel) {
+            channel.send(`🎉 Merci infiniment pour le boost du serveur, ${newMember} ! T'assures grave 🚀`);
+        }
     }
 });
+
 client.login(process.env.DISCORD_TOKEN);
