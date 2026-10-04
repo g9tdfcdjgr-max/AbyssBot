@@ -102,12 +102,34 @@ async function updateLevelRole(member, level) {
     }
 }
 
-client.on('ready', () => {
+client.on('ready', async () => {
     console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
 
+    // Enregistrement de la Slash Command /dire sur le premier serveur du bot
+    const guild = client.guilds.cache.first();
+    if (guild) {
+        try {
+            await guild.commands.create({
+                name: 'dire',
+                description: 'Fait dire un message au bot de manière invisible',
+                options: [
+                    {
+                        name: 'texte',
+                        description: 'Le texte que le bot doit dire',
+                        type: 3, // Type 3 = STRING
+                        required: true
+                    }
+                ]
+            });
+            console.log("🛠️ Slash command /dire enregistrée avec succès !");
+        } catch (e) {
+            console.error("Erreur enregistrement slash command :", e);
+        }
+    }
+
     // Auto-sync des vocaux dès que le bot s'allume pour ne rater personne
-    client.guilds.cache.forEach(guild => {
-        guild.channels.cache.forEach(channel => {
+    client.guilds.cache.forEach(g => {
+        g.channels.cache.forEach(channel => {
             if (channel.type === ChannelType.GuildVoice) {
                 channel.members.forEach(member => {
                     if (!member.user.bot && !voiceJoinTimes[member.id]) {
@@ -117,7 +139,7 @@ client.on('ready', () => {
             }
         });
     });
-    console.log("🎙️️ Synchronisation automatique des membres en vocal effectuée au démarrage !");
+    console.log("🎙️ Synchronisation automatique des membres en vocal effectuée au démarrage !");
 });
 
 // =========================================================
@@ -125,16 +147,6 @@ client.on('ready', () => {
 // =========================================================
 client.on('messageCreate', async message => {
     if (!message.guild || message.author.bot) return;
-
-    // --- SUPPRESSION INSTANTANÉE DE !DIRE ---
-    if (message.content.startsWith('!dire')) {
-        await message.delete().catch(() => {});
-        const texte = message.content.slice(5).trim();
-        if (texte) {
-            return message.channel.send(texte);
-        }
-        return;
-    }
 
     // --- ANTI-SPAM ---
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
@@ -147,7 +159,7 @@ client.on('messageCreate', async message => {
         if (userSpamLog[userId].length >= 5) {
             userSpamLog[userId] = [];
             await message.delete().catch(() => {});
-            const warningMsg = await message.channel.send(`⚠ ${message.author}, calme-toi sur le spam !`);
+            const warningMsg = await message.channel.send(`⚠️ ${message.author}, calme-toi sur le spam !`);
             setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
             return;
         }
@@ -272,10 +284,10 @@ client.on('messageCreate', async message => {
                 { name: '📋 `!listwarns @membre`', value: 'Affiche la liste des avertissements.' },
                 { name: '🗑 `!delwarn @membre [numéro]`', value: 'Supprime un avertissement.' },
                 { name: '🔨 `!ban @membre [raison]`', value: 'Bannit un membre.' },
-                { name: '🗣️ `!dire [texte]`', value: 'Fait dire un message au bot.' },
+                { name: '🗣️ `/dire [texte]`', value: 'Fait dire un message au bot (Slash Command).' },
                 { name: '📊 `s?u [@membre]`', value: 'Affiche tes statistiques détaillées.' },
                 { name: '🏆 `s?topmsg`', value: 'Classement des messages.' },
-                { name: '🎙️ `s?topvoc`', value: 'Classement du temps vocal.' }
+                { name: '🎙️️ `s?topvoc`', value: 'Classement du temps vocal.' }
             )
             .setFooter({ text: 'Bot Abyss • Système complet de gestion et sécurité' });
         return message.channel.send({ embeds: [embedHelp] });
@@ -448,7 +460,7 @@ client.on('messageCreate', async message => {
             .setColor('#00FF7F')
             .addFields(
                 { name: '💬 Messages', value: `${stats.messages}`, inline: true },
-                { name: '🎙️ Temps vocal', value: `${hours}h ${mins}m`, inline: true }
+                { name: '🎙️️ Temps vocal', value: `${hours}h ${mins}m`, inline: true }
             )
             .setThumbnail(target.user.displayAvatarURL());
         return message.channel.send({ embeds: [embedStats] });
@@ -469,15 +481,27 @@ client.on('messageCreate', async message => {
             const h = Math.floor(data.voiceTime / 60), m = data.voiceTime % 60;
             return `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${h}h ${m}m**`;
         }).join('\n');
-        const embed = new EmbedBuilder().setTitle('🎙️ Top 10 — Temps Vocal').setColor('#3498DB').setDescription(leaderboard);
+        const embed = new EmbedBuilder().setTitle('🎙️️ Top 10 — Temps Vocal').setColor('#3498DB').setDescription(leaderboard);
         return message.channel.send({ embeds: [embed] });
     }
 });
 
 // =========================================================
-// GESTION DES INTERACTIONS (BOUTONS & MENUS)
+// GESTION DES INTERACTIONS (BOUTONS, MENUS & SLASH COMMANDS)
 // =========================================================
 client.on('interactionCreate', async interaction => {
+    // Gestion de la Slash Command /dire
+    if (interaction.isChatInputCommand() && interaction.commandName === 'dire') {
+        const texte = interaction.options.getString('texte');
+        
+        // Répond de façon éphémère (invisible pour les autres) puis supprime l'accusé de réception
+        await interaction.reply({ content: 'Message envoyé !', flags: 64 });
+        await interaction.deleteReply().catch(() => {});
+
+        // Envoie le vrai message de manière ultra propre et instantanée
+        return interaction.channel.send(texte);
+    }
+
     if (interaction.isButton() && (interaction.customId.startsWith('ban_yes_') || interaction.customId.startsWith('ban_no_'))) {
         if (interaction.user.id !== TON_ID_DISCORD) return interaction.reply({ content: "Réservé au créateur !", flags: 64 });
         const targetId = interaction.customId.split('_')[2];
