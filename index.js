@@ -289,12 +289,11 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-// --- SYSTÈME DE BIENVENUE 100% BLEU AUTOMATIQUE DANS 💬chat ---
+// --- SYSTÈME DE BIENVENUE 100% BLEU AVEC GIF ANIMÉ BLEU ---
 client.on('guildMemberAdd', async member => {
-    // Le bot cherche un salon nommé exactement "💬chat" ou contenant "chat"
-    const channel = member.guild.channels.cache.find(c => 
-        c.isTextBased() && (c.name === '💬chat' || c.name.includes('chat') || c.name.includes('general'))
-    );
+    // 💬 Remplace par l'ID exact de ton salon 💬chat
+    const channelId = '1554966441462337608'; 
+    const channel = member.guild.channels.cache.get(channelId);
     
     if (!channel) return;
 
@@ -308,7 +307,7 @@ client.on('guildMemberAdd', async member => {
         .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
-    // Envoi du message stylé dans le salon trouvé
+    // Envoi du message stylé dans le salon
     await channel.send({ 
         content: `💙 Bienvenue sur le serveur, ${member} !`, 
         embeds: [welcomeEmbed] 
