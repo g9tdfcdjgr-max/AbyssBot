@@ -15,8 +15,13 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 // --- CONFIGURATION MONGODB ---
+// --- CONFIGURATION MONGODB ---
 const uri = process.env.MONGO_URI;
-const mongoClient = new MongoClient(uri);
+const mongoClient = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 5000,
+    tls: true,
+    tlsAllowInvalidCertificates: true // Contourne temporairement le blocage SSL de Render
+});
 
 let db, statsCollection, warnsCollection;
 
