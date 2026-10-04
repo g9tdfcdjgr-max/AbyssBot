@@ -1,6 +1,8 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { MongoClient } = require('mongodb');
 const express = require('express');
+// ID du salon pour les boosts
+const BOOST_CHANNEL_ID = "1554966441462337608";
 
 // --- CONFIGURATION DU SERVEUR WEB POUR RENDER ---
 const app = express();
@@ -629,6 +631,18 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 }
             }
         }
+    }
+});
+// --- SYSTÈMES DE BOOST ---
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    const oldBoost = oldMember.premiumSince;
+    const newBoost = newMember.premiumSince;
+
+    if (!oldBoost && newBoost) {
+        const channel = newMember.guild.channels.cache.get(BOOST_CHANNEL_ID);
+        if (!channel) return;
+
+        channel.send(`🎉 Merci à ${newMember} d'avoir boosté le serveur ! 🚀`);
     }
 });
 client.login(process.env.DISCORD_TOKEN);
