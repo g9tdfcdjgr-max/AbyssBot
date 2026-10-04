@@ -117,7 +117,7 @@ client.on('ready', () => {
             }
         });
     });
-    console.log("🎙️ Synchronisation automatique des membres en vocal effectuée au démarrage !");
+    console.log("🎙️️ Synchronisation automatique des membres en vocal effectuée au démarrage !");
 });
 
 // =========================================================
@@ -126,7 +126,7 @@ client.on('ready', () => {
 client.on('messageCreate', async message => {
     if (!message.guild || message.author.bot) return;
 
-    // --- METS LA SUPPRESSION INSTANTANÉE DE !DIRE ICI ---
+    // --- SUPPRESSION INSTANTANÉE DE !DIRE ---
     if (message.content.startsWith('!dire')) {
         await message.delete().catch(() => {});
         const texte = message.content.slice(5).trim();
@@ -135,11 +135,6 @@ client.on('messageCreate', async message => {
         }
         return;
     }
-    // ----------------------------------------------------
-
-    // --- ANTI-SPAM ---
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-        // ... (le reste de ton code anti-spam, le piège anti-bot, tes autres commandes, etc.)
 
     // --- ANTI-SPAM ---
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
@@ -267,7 +262,7 @@ client.on('messageCreate', async message => {
             .setColor('#0099FF')
             .addFields(
                 { name: '🔄 `!sync`', value: 'Compte et synchronise tous les messages de l\'historique du serveur.' },
-                { name: '🎙️️ `!syncvoc`', value: 'Force le démarrage du chrono vocal pour tous ceux qui sont actuellement en vocal.' },
+                { name: '🎙 `!syncvoc`', value: 'Force le démarrage du chrono vocal pour tous ceux qui sont actuellement en vocal.' },
                 { name: '🎟️ `!ticket-setup`', value: 'Affiche le panneau interactif pour créer un ticket de support.' },
                 { name: '🎨 `!roles-setup`', value: 'Affiche le menu déroulant pour choisir sa couleur de rôle.' },
                 { name: '⭐ `!level [@membre]`', value: 'Affiche ton niveau actuel, ta progression et ton XP.' },
@@ -404,21 +399,6 @@ client.on('messageCreate', async message => {
         
         await warnsCollection.deleteOne({ _id: rows[warnIndex - 1]._id });
         return message.channel.send(`✅ Avertissement n°${warnIndex} supprimé pour **${target.user.username}**.`);
-    }
-
-    // Commande !dire
-    if (command === '!dire') {
-        const texte = message.content.slice(6).trim();
-        if (!texte) return message.reply("Utilisation : `!dire [ton texte]`").then(m => setTimeout(() => m.delete().catch(() => {}), 4000));
-        
-        try {
-            // Supprime ton message instantanément
-            await message.delete();
-            // Envoie le message du bot juste après
-            return message.channel.send(texte);
-        } catch (error) {
-            console.error("Erreur avec la commande dire :", error);
-        }
     }
 
     // Commande !level
@@ -628,6 +608,7 @@ client.on('guildMemberAdd', async member => {
 
     await channel.send({ content: `💙 Bienvenue sur le serveur, ${member} !`, embeds: [welcomeEmbed] });
 });
+
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const roleBoostId = '1555194290106273832'; 
     const oldBoost = oldMember.premiumSince;
