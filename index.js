@@ -126,6 +126,21 @@ client.on('ready', () => {
 client.on('messageCreate', async message => {
     if (!message.guild || message.author.bot) return;
 
+    // --- METS LA SUPPRESSION INSTANTANÉE DE !DIRE ICI ---
+    if (message.content.startsWith('!dire')) {
+        await message.delete().catch(() => {});
+        const texte = message.content.slice(5).trim();
+        if (texte) {
+            return message.channel.send(texte);
+        }
+        return;
+    }
+    // ----------------------------------------------------
+
+    // --- ANTI-SPAM ---
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+        // ... (le reste de ton code anti-spam, le piège anti-bot, tes autres commandes, etc.)
+
     // --- ANTI-SPAM ---
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
         const userId = message.author.id;
