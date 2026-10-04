@@ -1,4 +1,32 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const sqlite3 = require('sqlite3').verbose();
+
+// Initialisation de la base de données SQLite (sauvegardée dans un fichier local)
+const db = new sqlite3.Database('./database.sqlite', (err) => {
+    if (err) console.error("Erreur de connexion à la base de données :", err.message);
+    else console.log("📦 Base de données SQLite connectée avec succès !");
+});
+
+// Création des tables si elles n'existent pas
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS stats (
+        userId TEXT PRIMARY KEY,
+        messages INTEGER DEFAULT 0,
+        voiceTime INTEGER DEFAULT 0,
+        xp INTEGER DEFAULT 0,
+        level INTEGER DEFAULT 1
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS warns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT,
+        reason TEXT,
+        moderator TEXT
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS points (
+        userId TEXT PRIMARY KEY,
+        points INTEGER DEFAULT 0
+    )`);
+});
 
 const http = require('http');
 const server = http.createServer((req, res) => {
@@ -19,12 +47,8 @@ const client = new Client({
     ]
 });
 
-const userStats = {};
 const voiceJoinTimes = {};
-const userWarns = {}; // { userId: [ { reason: "...", moderator: "..." } ] }
-const points = {};
-const userSpamLog = {};
-const userXp = {}; // { userId: { xp: 0, level: 1 } }
+const userSpamLog = {}; 
 
 const TON_ID_DISCORD = '1095675404859215902';
 const ROLE_MOD_ID = '1554974958692859956';
@@ -36,6 +60,19 @@ function canUseModCommands(member) {
     const modRole = member.guild.roles.cache.get(ROLE_MOD_ID);
     if (!modRole) return false;
     return member.roles.highest.position >= modRole.position;
+}
+
+// Fonction utilitaire pour récupérer ou créer un utilisateur en base
+function getUserData(userId, callback) {
+    db.get(`SELECT * FROM stats WHERE userId = ?`, [userId], (err, row) => {
+        if (!row) {
+            db.run(`INSERT INTO stats (userId, messages, voiceTime, xp, level) VALUES (?, 0, 0, 0, 1)`, [userId], () => {
+                callback({ userId, messages: 0, voiceTime: 0, xp: 0, level: 1 });
+            });
+        } else {
+            callback(row);
+        }
+    });
 }
 
 // Fonction pour attribuer automatiquement le rôle de palier selon le niveau
@@ -111,28 +148,22 @@ client.on('messageCreate', async message => {
         return;
     }
 
-    // Compteur de messages & Système d'XP / Niveaux automatique
-    if (!userStats[message.author.id]) {
-        userStats[message.author.id] = { messages: 0, voiceTime: 0 };
-    }
-    userStats[message.author.id].messages += 1;
+    // Gestion base de données messages & XP
+    getUserData(message.author.id, async (userData) => {
+        let newMessages = userData.messages + 1;
+        let newXp = userData.xp + (Math.floor(Math.random() * 3) + 2);
+        let newLevel = userData.level;
+        let xpNeeded = newLevel * newLevel * 50;
 
-    if (!userXp[message.author.id]) {
-        userXp[message.author.id] = { xp: 0, level: 1 };
-    }
-    const userData = userXp[message.author.id];
-    userData.xp += Math.floor(Math.random() * 3) + 2;
-    const xpNeeded = userData.level * userData.level * 50;
-    
-    if (userData.xp >= xpNeeded) {
-        userData.xp -= xpNeeded;
-        userData.level += 1;
-        
-        // Met à jour les rôles automatiquement lors du passage de niveau
-        await updateLevelRole(message.member, userData.level);
+        if (newXp >= xpNeeded) {
+            newXp -= xpNeeded;
+            newLevel += 1;
+            await updateLevelRole(message.member, newLevel);
+            message.channel.send(`🎉 Félicitations ${message.author}, tu passes au **niveau ${newLevel}** ! 🚀`).catch(() => {});
+        }
 
-        message.channel.send(`🎉 Félicitations ${message.author}, tu passes au **niveau ${userData.level}** ! 🚀`).catch(() => {});
-    }
+        db.run(`UPDATE stats SET messages = ?, xp = ?, level = ? WHERE userId = ?`, [newMessages, newXp, newLevel, message.author.id]);
+    });
 
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
@@ -201,7 +232,7 @@ client.on('messageCreate', async message => {
         return message.channel.send({ embeds: [embed], components: [row] });
     }
 
-    // Commande !clear (Purge de messages)
+    // Commande !clear
     if (command === '!clear') {
         if (!canUseModCommands(message.member)) {
             return message.reply("Tu n'as pas la permission d'utiliser cette commande !");
@@ -240,22 +271,23 @@ client.on('messageCreate', async message => {
         if (!target) return message.reply('Utilisation : `!warn @membre [raison]`');
         const reason = args.slice(2).join(' ') || 'Aucune raison';
 
-        if (!userWarns[target.id]) userWarns[target.id] = [];
-        userWarns[target.id].push({ reason, moderator: message.author.tag });
-        const totalWarns = userWarns[target.id].length;
+        db.run(`INSERT INTO warns (userId, reason, moderator) VALUES (?, ?, ?)`, [target.id, reason, message.author.tag], () => {
+            db.get(`SELECT COUNT(*) as count FROM warns WHERE userId = ?`, [target.id], async (err, row) => {
+                const totalWarns = row.count;
+                await message.channel.send(`⚠️ **${target}** a reçu un avertissement. (Total : **${totalWarns}/3**) \nRaison : ${reason}`);
 
-        await message.channel.send(`⚠️ **${target}** a reçu un avertissement. (Total : **${totalWarns}/3**) \nRaison : ${reason}`);
-
-        if (totalWarns >= 3) {
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`ban_yes_${target.id}`).setLabel('🔨 Oui, bannir').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId(`ban_no_${target.id}`).setLabel('❌ Ignorer').setStyle(ButtonStyle.Secondary)
-            );
-            await message.channel.send({
-                content: `<@${TON_ID_DISCORD}> 🚨 **Alerte modération** : ${target.user.tag} a atteint **3 avertissements** ! Veux-tu le bannir ?`,
-                components: [row]
+                if (totalWarns >= 3) {
+                    const rowAction = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder().setCustomId(`ban_yes_${target.id}`).setLabel('🔨 Oui, bannir').setStyle(ButtonStyle.Danger),
+                        new ButtonBuilder().setCustomId(`ban_no_${target.id}`).setLabel('❌ Ignorer').setStyle(ButtonStyle.Secondary)
+                    );
+                    await message.channel.send({
+                        content: `<@${TON_ID_DISCORD}> 🚨 **Alerte modération** : ${target.user.tag} a atteint **3 avertissements** ! Veux-tu le bannir ?`,
+                        components: [rowAction]
+                    });
+                }
             });
-        }
+        });
         return;
     }
 
@@ -263,24 +295,31 @@ client.on('messageCreate', async message => {
     if (command === '!listwarns') {
         if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const target = message.mentions.members.first() || message.member;
-        const warns = userWarns[target.id] || [];
-        if (warns.length === 0) return message.channel.send(`✅ **${target.user.username}** n'a aucun avertissement.`);
-
-        const list = warns.map((w, index) => `**#${index + 1}** — Raison : *${w.reason}* (Par ${w.moderator})`).join('\n');
-        const embedWarns = new EmbedBuilder().setTitle(`📋 Avertissements de ${target.user.username}`).setDescription(list).setColor('#FFA500');
-        return message.channel.send({ embeds: [embedWarns] });
+        db.all(`SELECT * FROM warns WHERE userId = ?`, [target.id], (err, rows) => {
+            if (!rows || rows.length === 0) return message.channel.send(`✅ **${target.user.username}** n'a aucun avertissement.`);
+            const list = rows.map((w, index) => `**#${index + 1}** — Raison : *${w.reason}* (Par ${w.moderator})`).join('\n');
+            const embedWarns = new EmbedBuilder().setTitle(`📋 Avertissements de ${target.user.username}`).setDescription(list).setColor('#FFA500');
+            return message.channel.send({ embeds: [embedWarns] });
+        });
+        return;
     }
 
     // Commande !delwarn
     if (command === '!delwarn') {
         if (!canUseModCommands(message.member)) return message.reply("Tu n'as pas la permission !");
         const target = message.mentions.members.first();
-        const warnIndex = parseInt(args[2]) - 1;
-        if (!target || isNaN(warnIndex) || !userWarns[target.id] || !userWarns[target.id][warnIndex]) {
+        const warnIndex = parseInt(args[2]);
+        if (!target || isNaN(warnIndex)) {
             return message.reply('Utilisation : `!delwarn @membre [numéro]`');
         }
-        userWarns[target.id].splice(warnIndex, 1);
-        return message.channel.send(`✅ L'avertissement n°${warnIndex + 1} de **${target.user.username}** a été supprimé.`);
+        db.all(`SELECT id FROM warns WHERE userId = ?`, [target.id], (err, rows) => {
+            if (!rows || !rows[warnIndex - 1]) return message.reply("Avertissement introuvable.");
+            const warnIdToDelete = rows[warnIndex - 1].id;
+            db.run(`DELETE FROM warns WHERE id = ?`, [warnIdToDelete], () => {
+                return message.channel.send(`✅ L'avertissement n°${warnIndex} de **${target.user.username}** a été supprimé.`);
+            });
+        });
+        return;
     }
 
     // Commande !dire
@@ -293,22 +332,22 @@ client.on('messageCreate', async message => {
     // Système de niveaux (!level / !lvl)
     if (command === '!level' || command === '!lvl') {
         const target = message.mentions.members.first() || message.member;
-        if (!userXp[target.id]) userXp[target.id] = { xp: 0, level: 1 };
-        const data = userXp[target.id];
-        const needed = data.level * 100;
-
-        const embedLevel = new EmbedBuilder()
-            .setTitle(`⭐ Niveau de ${target.user.username}`)
-            .setColor('#0099FF')
-            .addFields(
-                { name: '📈 Niveau', value: `${data.level}`, inline: true },
-                { name: '✨ XP Actuel', value: `${data.xp} / ${needed} XP`, inline: true }
-            )
-            .setThumbnail(target.user.displayAvatarURL());
-        return message.channel.send({ embeds: [embedLevel] });
+        getUserData(target.id, (data) => {
+            const needed = data.level * 100;
+            const embedLevel = new EmbedBuilder()
+                .setTitle(`⭐ Niveau de ${target.user.username}`)
+                .setColor('#0099FF')
+                .addFields(
+                    { name: '📈 Niveau', value: `${data.level}`, inline: true },
+                    { name: '✨ XP Actuel', value: `${data.xp} / ${needed} XP`, inline: true }
+                )
+                .setThumbnail(target.user.displayAvatarURL());
+            return message.channel.send({ embeds: [embedLevel] });
+        });
+        return;
     }
 
-    // Commande !setlevel (Modifie le niveau ET attribue automatiquement le rôle correspondant)
+    // Commande !setlevel
     if (command === '!setlevel') {
         if (message.author.id !== TON_ID_DISCORD) {
             return message.reply("Seul le créateur du bot peut utiliser cette commande !");
@@ -320,14 +359,13 @@ client.on('messageCreate', async message => {
             return message.reply("Utilisation correcte : `!setlevel @membre [niveau]` (Exemple : `!setlevel @Modo 45`)");
         }
 
-        if (!userXp[target.id]) userXp[target.id] = { xp: 0, level: 1 };
-        userXp[target.id].level = newLevel;
-        userXp[target.id].xp = 0;
-
-        // Attribue le rôle de grade correspondant à ce nouveau niveau
-        await updateLevelRole(target, newLevel);
-
-        return message.channel.send(`⭐ Bravo ${target} ! Ton niveau a été défini au **niveau ${newLevel}** par le créateur et ton rôle de grade a été mis à jour ! 🚀`);
+        getUserData(target.id, async () => {
+            db.run(`UPDATE stats SET level = ?, xp = 0 WHERE userId = ?`, [newLevel, target.id], async () => {
+                await updateLevelRole(target, newLevel);
+                return message.channel.send(`⭐ Bravo ${target} ! Ton niveau a été défini au **niveau ${newLevel}** par le créateur et ton rôle de grade a été mis à jour ! 🚀`);
+            });
+        });
+        return;
     }
 
     // Système de points
@@ -335,51 +373,67 @@ client.on('messageCreate', async message => {
         if (message.author.id !== TON_ID_DISCORD) return message.reply("Permissions insuffisantes.");
         const target = message.mentions.users.first();
         if (!target) return message.reply("Mentionne quelqu'un !");
-        if (!points[target.id]) points[target.id] = 0;
-        points[target.id] += 1;
-        return message.channel.send(`✅ 1 point ajouté à ${target.username}. Total : **${points[target.id]} point(s)**.`);
+        
+        db.get(`SELECT points FROM points WHERE userId = ?`, [target.id], (err, row) => {
+            let currentPoints = row ? row.points : 0;
+            currentPoints += 1;
+            db.run(`INSERT OR REPLACE INTO points (userId, points) VALUES (?, ?)`, [target.id, currentPoints], () => {
+                return message.channel.send(`✅ 1 point ajouté à ${target.username}. Total : **${currentPoints} point(s)**.`);
+            });
+        });
+        return;
     }
 
     if (command === '!point') {
         const target = message.mentions.users.first() || message.author;
-        return message.channel.send(`🏆 ${target.username} a **${points[target.id] || 0} point(s)**.`);
+        db.get(`SELECT points FROM points WHERE userId = ?`, [target.id], (err, row) => {
+            let p = row ? row.points : 0;
+            return message.channel.send(`🏆 ${target.username} a **${p} point(s)**.`);
+        });
+        return;
     }
 
     // Statistiques : s?u
     if (command.startsWith('s?u')) {
         const target = message.mentions.members.first() || message.member;
-        const stats = userStats[target.id] || { messages: 0, voiceTime: 0 };
-        const hours = Math.floor(stats.voiceTime / 60);
-        const mins = stats.voiceTime % 60;
+        getUserData(target.id, (stats) => {
+            const hours = Math.floor(stats.voiceTime / 60);
+            const mins = stats.voiceTime % 60;
 
-        const embedStats = new EmbedBuilder()
-            .setTitle(`📊 Statistiques de ${target.user.username}`)
-            .setColor('#00FF7F')
-            .addFields(
-                { name: '💬 Messages envoyés', value: `${stats.messages}`, inline: true },
-                { name: '🎙️ Temps en vocal', value: `${hours}h ${mins}m`, inline: true }
-            )
-            .setThumbnail(target.user.displayAvatarURL());
-        return message.channel.send({ embeds: [embedStats] });
+            const embedStats = new EmbedBuilder()
+                .setTitle(`📊 Statistiques de ${target.user.username}`)
+                .setColor('#00FF7F')
+                .addFields(
+                    { name: '💬 Messages envoyés', value: `${stats.messages}`, inline: true },
+                    { name: '🎙️ Temps en vocal', value: `${hours}h ${mins}m`, inline: true }
+                )
+                .setThumbnail(target.user.displayAvatarURL());
+            return message.channel.send({ embeds: [embedStats] });
+        });
+        return;
     }
 
     if (command === 's?topmsg') {
-        const sorted = Object.entries(userStats).sort(([, a], [, b]) => b.messages - a.messages).slice(0, 10);
-        if (sorted.length === 0) return message.channel.send('Aucune donnée.');
-        const leaderboard = sorted.map(([id, data], i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${id}> — **${data.messages}** msgs`).join('\n');
-        const embed = new EmbedBuilder().setTitle('🏆 Top 10 — Messages').setColor('#F1C40F').setDescription(leaderboard);
-        return message.channel.send({ embeds: [embed] });
+        db.all(`SELECT userId, messages FROM stats ORDER BY messages DESC LIMIT 10`, [], (err, rows) => {
+            if (!rows || rows.length === 0) return message.channel.send('Aucune donnée.');
+            const leaderboard = rows.map((data, i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${data.messages}** msgs`).join('\n');
+            const embed = new EmbedBuilder().setTitle('🏆 Top 10 — Messages').setColor('#F1C40F').setDescription(leaderboard);
+            return message.channel.send({ embeds: [embed] });
+        });
+        return;
     }
 
     if (command === 's?topvoc') {
-        const sorted = Object.entries(userStats).sort(([, a], [, b]) => b.voiceTime - a.voiceTime).slice(0, 10);
-        if (sorted.length === 0) return message.channel.send('Aucune donnée.');
-        const leaderboard = sorted.map(([id, data], i) => {
-            const h = Math.floor(data.voiceTime / 60), m = data.voiceTime % 60;
-            return `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${id}> — **${h}h ${m}m**`;
-        }).join('\n');
-        const embed = new EmbedBuilder().setTitle('🎙️ Top 10 — Temps Vocal').setColor('#3498DB').setDescription(leaderboard);
-        return message.channel.send({ embeds: [embed] });
+        db.all(`SELECT userId, voiceTime FROM stats ORDER BY voiceTime DESC LIMIT 10`, [], (err, rows) => {
+            if (!rows || rows.length === 0) return message.channel.send('Aucune donnée.');
+            const leaderboard = rows.map((data, i) => {
+                const h = Math.floor(data.voiceTime / 60), m = data.voiceTime % 60;
+                return `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`} <@${data.userId}> — **${h}h ${m}m**`;
+            }).join('\n');
+            const embed = new EmbedBuilder().setTitle('🎙️ Top 10 — Temps Vocal').setColor('#3498DB').setDescription(leaderboard);
+            return message.channel.send({ embeds: [embed] });
+        });
+        return;
     }
 });
 
@@ -387,7 +441,6 @@ client.on('messageCreate', async message => {
 // GESTION DES INTERACTIONS (BOUTONS & MENUS)
 // =========================================================
 client.on('interactionCreate', async interaction => {
-    // Boutons de Warn (Ban / Ignorer)
     if (interaction.isButton() && (interaction.customId.startsWith('ban_yes_') || interaction.customId.startsWith('ban_no_'))) {
         if (interaction.user.id !== TON_ID_DISCORD) {
             return interaction.reply({ content: "Seul le créateur du bot peut utiliser ces boutons !", flags: 64 });
@@ -406,7 +459,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // Bouton Ticket
     if (interaction.isButton() && interaction.customId === 'create_ticket') {
         const guild = interaction.guild;
         const channelName = `ticket-${interaction.user.username}`.toLowerCase();
@@ -433,7 +485,6 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: `Ticket créé : ${channel}`, flags: 64 });
     }
 
-    // Fermeture de Ticket
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
         const isOwner = interaction.user.id === TON_ID_DISCORD;
         const isMod = interaction.member.roles.cache.has(ROLE_MOD_ID);
@@ -449,7 +500,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // Menu Déroulant des Rôles de Couleur
     if (interaction.isStringSelectMenu() && interaction.customId === 'select_color_role') {
         await interaction.deferReply({ flags: 64 });
 
@@ -484,21 +534,25 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     const userId = newState.id || oldState.id;
     if (newState.member?.user.bot) return;
 
-    if (!userStats[userId]) userStats[userId] = { messages: 0, voiceTime: 0 };
-
     if (!oldState.channelId && newState.channelId) {
         voiceJoinTimes[userId] = Date.now();
     }
     if (oldState.channelId && !newState.channelId) {
         if (voiceJoinTimes[userId]) {
             const minutes = Math.floor((Date.now() - voiceJoinTimes[userId]) / 60000);
-            userStats[userId].voiceTime += minutes;
             delete voiceJoinTimes[userId];
+
+            if (minutes > 0) {
+                getUserData(userId, (stats) => {
+                    const newVoiceTime = stats.voiceTime + minutes;
+                    db.run(`UPDATE stats SET voiceTime = ? WHERE userId = ?`, [newVoiceTime, userId]);
+                });
+            }
         }
     }
 });
 
-// Accueil Nouveau Membre (100% Bleu avec image)
+// Accueil Nouveau Membre
 client.on('guildMemberAdd', async member => {
     const channelId = '1554966441462337608'; 
     const channel = member.guild.channels.cache.get(channelId);
@@ -509,7 +563,7 @@ client.on('guildMemberAdd', async member => {
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
         .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment parmi nous.\n\n✦ **Rôle :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-        .setImage('https://cdn.discordapp.com/attachments/1517488205694369864/1556273762876391554/surprise-girl.gif?')
+        .setImage('https://cdn.discordapp.com/attachments/1517488205694369864/1556273762876391554/surprise-girl.gif')
         .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
