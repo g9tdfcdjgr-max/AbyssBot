@@ -600,12 +600,11 @@ client.on('guildMemberAdd', async member => {
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
         .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+        .setImage('https://c.tenor.com/JmKVFAnSF70AAAAC/blue-hair-anime.gif')
         .setTimestamp();
-        .setImage('https://c.tenor.com/JmKVFAnSF70AAAAC/blue-hair-anime.gif') // <--- Mets ton lien de GIF ici !
 
     await channel.send({ content: `💙 Bienvenue sur le serveur, ${member} !`, embeds: [welcomeEmbed] });
 });
-
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const roleBoostId = '1555194290106273832'; 
     const oldBoost = oldMember.premiumSince;
