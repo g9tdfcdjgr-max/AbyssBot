@@ -1,5 +1,16 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('Abyss Bot est en ligne !');
+});
+
+app.listen(port, () => {
+  console.log(`Serveur prêt sur le port ${port}`);
+});
 
 // Initialisation de la base de données SQLite (sauvegardée dans un fichier local)
 const db = new sqlite3.Database('./database.sqlite', (err) => {
