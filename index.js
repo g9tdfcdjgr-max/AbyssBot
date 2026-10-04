@@ -504,7 +504,7 @@ client.on('guildMemberAdd', async member => {
         .setTitle('💎 NOUVEAU MEMBRE ARRIVÉ ! 💎')
         .setDescription(`Bienvenue à toi, ${member}, sur **${member.guild.name}** !\n\n> 🌊 Installe-toi confortablement, va lire le règlement et passe un excellent moment parmi nous.\n\n✦ **Rôle :** Membre\n✦ **Statut :** Prêt à naviguer 🚀`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-        .setImage('https://media1.tenor.com/m/3mK91TaNomQAAAAC/surprise-girl.gif')
+        .setImage('https://cdn.discordapp.com/attachments/1517488205694369864/1556273762876391554/surprise-girl.gif?')
         .setFooter({ text: `Membre n°${member.guild.memberCount} • Abyss Security`, iconURL: member.guild.iconURL() })
         .setTimestamp();
 
